@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SchoolyConnect
 {
@@ -168,7 +166,7 @@ namespace SchoolyConnect
             t2.MyClass = cl2;
            
             // on constraints: 
-            t2.tt[3,2] = t3.tt[1, 1] = true; 
+            t2.tt[3,2] = t3.tt[1, 1] = t1.tt[1,1] = true; 
             cl1.tt[3, 2] = cl1.tt[1, 1] = true; 
                         
 
@@ -176,14 +174,14 @@ namespace SchoolyConnect
                 Name = "Math",
                 Hours = 5,
                 Classes = new List<_Class> { cl1, cl2 },
-                Teachers = new List<_Teacher> { t3, t4}
+                Teachers = new List<_Teacher> { t1, t3, t4 }
             });
             courses.Add(new _Course()
             {
                 Name = "English",
                 Hours = 3,
                 Classes = new List<_Class> { cl1 },
-                Teachers = new List<_Teacher> { t3 }
+                Teachers = new List<_Teacher> {t1, t3 }
             });
         }
 

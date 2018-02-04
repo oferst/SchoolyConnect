@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SchoolyConnect
 {
@@ -88,12 +86,13 @@ namespace SchoolyConnect
             Console.Write(tHomeCourses[0].Name + " = " + d);
             for (int i = 1; i < tHomeCourses.Count; ++i)
             {
-                Console.Write("\\/" + tHomeCourses[i] + " = " + d);
+                Console.Write("\\/" + tHomeCourses[i].Name + " = " + d);
             }
+            Console.WriteLine();
         }
 
         /// <summary>
-        /// Teacher's active days in his own class
+        /// Teacher's active days in his own class. Currently forces each day to be active.
         /// </summary>
         void con_ActiveOnDay()
         {            
@@ -107,9 +106,21 @@ namespace SchoolyConnect
                     if (!c.Teachers.Contains(t)) continue; // t is not the teacher of that course
                     tHomeCourses.Add(c);
                 }
+                if (tHomeCourses.Count == 0) continue;
                 for (int d = 1; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                 {
-                    con_ActiveOnDay(tHomeCourses, d);
+                    bool on_thatDay = false;
+                    // checking t's availability on that day
+                    for (int h = 1; h < _ObjectWithTimeTable.MAX_SLOT; ++h)
+                    {
+                        if (t.is_on(d,h))
+                        {
+                            on_thatDay = true;
+                            break;
+                        }
+                    }
+                    if (on_thatDay)
+                        con_ActiveOnDay(tHomeCourses, d);
                 }
             }
         }
@@ -127,6 +138,7 @@ namespace SchoolyConnect
 
             con_off();
 
+            // Soft constraints:
             con_ActiveOnDay();
             
 
