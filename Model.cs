@@ -140,7 +140,6 @@ namespace SchoolyConnect
 
             // Soft constraints:
             con_ActiveOnDay();
-            
 
             SaveSolution();
         }
