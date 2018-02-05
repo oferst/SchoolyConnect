@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 namespace SchoolyConnect
 {
 
-    enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
+    enum COURSE_TYPE_ENUM { F=0,S=1,P=2};
 
     class _Object
     {
@@ -28,14 +28,14 @@ namespace SchoolyConnect
     class _ObjectWithTimeTable : _Object
     {
         public const int MAX_DAY = 6;
-        public const int MAX_SLOT = 10;
+        public const int MAX_HOUR = 10;
 
         protected _ObjectWithTimeTable () : base()
         {
          
         }
             
-        public bool[,] tt = new bool[MAX_DAY, MAX_SLOT]; // ofer changed to public
+        public bool[,] tt = new bool[MAX_DAY, MAX_HOUR]; // ofer changed to public
 
         public bool is_on (int day,int slot)
         {
@@ -104,28 +104,13 @@ namespace SchoolyConnect
             }
         }
         
-        public bool is_on(int day, int slot) // ofer changed to public
-        {
-            bool result = true;
-            Teachers.ForEach(delegate (_Teacher t)
-            {
-                result = result && t.is_on(day, slot);
-            });
-            if (result)
-            {
-                Classes.ForEach(delegate (_Class c)
-                {
-                    result = result && c.is_on(day, slot);
-                });
-            }
-            if (result)
-            {
-                Rooms?.ForEach(delegate (_Room r)
-                {
-                    result = result && r.is_on(day, slot);
-                });
-            }
-            return result;
+        public bool is_on(int day, int slot) 
+        {            
+            foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
+            if (Classes != null) foreach (var t in Classes)  if (!t.is_on(day, slot)) return false;
+            if (Rooms != null) foreach (var t in Rooms)    if (!t.is_on(day, slot)) return false;
+            
+            return true;
         }
     }
 
@@ -286,13 +271,14 @@ namespace SchoolyConnect
                 t2.MyClass = cl2;
 
                 // on constraints: 
-                t2.tt[3, 2] = t3.tt[1, 1] = t1.tt[1, 1] = true;
-                cl1.tt[3, 2] = cl1.tt[1, 1] = true;
+                //t2.tt[3, 2] = t3.tt[1, 1] = t1.tt[1, 1] = true;
+                //cl1.tt[3, 2] = cl1.tt[1, 1] = true;
 
 
                 courses.Add(new _Course()
                 {
                     Name = "Math",
+                    Id = "1",
                     Hours = 5,
                     Classes = new List<_Class> { cl1, cl2 },
                     Teachers = new List<_Teacher> { t1, t3, t4 }
@@ -300,6 +286,7 @@ namespace SchoolyConnect
                 courses.Add(new _Course()
                 {
                     Name = "English",
+                    Id = "2",
                     Hours = 3,
                     Classes = new List<_Class> { cl1 },
                     Teachers = new List<_Teacher> { t1, t3 }
