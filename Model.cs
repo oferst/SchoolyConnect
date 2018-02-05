@@ -1,17 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using CourseScheduling;
+using System.Collections;
 
 namespace SchoolyConnect
 {
     class TieSchedCourse : _Course
     {
-        public string my_private_prop;
-
-        public void My_private_method()
-        {
-            Console.WriteLine("Course " + Name + " with " +  Hours.ToString() + " hours " +   my_private_prop);
-        }
+        public string my_private_prop;        
 
         public TieSchedCourse(_Course c):base(c)
         {
@@ -22,21 +19,75 @@ namespace SchoolyConnect
     class TieSchedModel : ModelBase
     {
         List<TieSchedCourse> tCourses;
-        
+        Hashtable courseDVars = new Hashtable();
+        Hashtable courseHVars = new Hashtable();
 
-        public void PreProcess()
+        public Hashtable getCourseDVars { get { return courseDVars; } }
+        public Hashtable getCourseHVars { get { return courseHVars; } }
+
+        SimpleCSP Csp;
+
+
+        void InitVariables()
+        {
+            Domain domDays = new Domain(0, _ObjectWithTimeTable.MAX_DAY-1);
+            Domain domHours = new Domain(0, _ObjectWithTimeTable.MAX_HOUR-1);            
+
+            courseDVars.Clear();
+            courseHVars.Clear();
+            foreach (_Course c in tCourses)
+            {
+                Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id), domDays);
+                Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id), domHours);
+                courseDVars[vd.Name] = vd;
+                courseHVars[vh.Name] = vh;
+            }
+        }
+
+            public void PreProcess()
         {
             tCourses = new List<TieSchedCourse>(courses.Count);
             courses.ForEach(delegate (_Course c)
             {
                 tCourses.Add(new TieSchedCourse(c));
             });
-
+            InitVariables();
+            Csp = new SimpleCSP();
         }
 
-        void con_noOverlap (string c1, string c2, string reason)
+        Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID)
         {
-            Console.WriteLine("nooverlap(" + c1 + "," + c2 + "," + reason + ")");
+            Variable v = (Variable)(day ? courseDVars : courseHVars)[CourseVarName(day, type, courseID)];
+            if (v == null)
+                throw new Exception("Course metadata doesn't match course data: " + courseID + ", " + type.ToString());
+            return v;
+        }
+
+        string CourseVarName(bool day, COURSE_TYPE_ENUM type, string courseID)
+        {
+            return (day ? "d_" : "h_") + CourseVarName(type, courseID);
+        }
+
+        string CourseVarName(COURSE_TYPE_ENUM type, string courseID)
+        {
+            return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_")  + courseID;
+        }
+
+
+        void con_noOverlap (int c1, int c2, string reason)
+        {
+            Log("nooverlap(" + tCourses[c1].Name + "," + tCourses[c2].Name + "," + reason + ")");
+            Variable vd1 = CourseVar(true, tCourses[c1].Course_Type, tCourses[c1].Id);
+            Variable vd2 = CourseVar(true, tCourses[c2].Course_Type, tCourses[c2].Id);
+            Variable vh1 = CourseVar(false, tCourses[c1].Course_Type, tCourses[c1].Id);
+            Variable vh2 = CourseVar(false, tCourses[c2].Course_Type, tCourses[c2].Id);            
+
+            CompositeConstraint c;
+            c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
+                                            new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
+                                            new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
+            c.NegativeDisplayString = reason + ": no-overlap (" + tCourses[c1].Name + "," + tCourses[c2].Name+") ";
+            Csp.Constraints.Add(c);
         }
 
         /// <summary>
@@ -51,22 +102,44 @@ namespace SchoolyConnect
                     /* Two F-type courses that have shared classes cannot overlap */
                     if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
                         (tCourses[i].Classes.Intersect(tCourses[j].Classes)).Any())
-                        con_noOverlap(tCourses[i].Name, tCourses[j].Name, "classes");
+                    {
+                        con_noOverlap(i, j, "classes");
+                        continue;
+                    }
                     /* Two courses that have shared teachers cannot overlap */
                     if ((tCourses[i].Teachers.Intersect(tCourses[j].Teachers)).Any())
-                        con_noOverlap(tCourses[i].Name, tCourses[j].Name, "teachers");
+                    {
+                        con_noOverlap(i, j, "teachers");
+                        continue;
+                    }
                     /* Two F-type courses that have shared rooms cannot overlap */
                     if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
                         tCourses[i].Rooms != null && tCourses[j].Rooms != null &&
                         (tCourses[i].Rooms.Intersect(tCourses[j].Rooms)).Any())
-                        con_noOverlap(tCourses[i].Name, tCourses[j].Name, "rooms");
+                        con_noOverlap(i,j, "rooms");
                 }
             }
         }
 
-        void con_off(string c1, int day, int hour, string reason)
+        void con_off(_Course c1, int day, int hour, string reason)
         {
-            Console.WriteLine("off(" + c1 + "," + day + "," + hour + "," + reason + ")");
+            Log("off(" + c1 + "," + day + "," + hour + "," + reason + ")");
+
+            Variable vd = CourseVar(true, c1.Course_Type, c1.Id);
+            Variable vh = CourseVar(false, c1.Course_Type, c1.Id);
+            CompositeConstraint c = new CompositeConstraint(BooleanOperator.OR,
+                new Constraint[]
+                {
+                    new VarValConstraint(vd,day,ArithmeticalOperator.NEQ),
+                    new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
+                });
+            c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + ")";
+            Csp.Constraints.Add(c);
+        }
+
+        private void Log(string v)
+        {
+            GlobalVar.Log.WriteLine(v);
         }
 
         /// <summary>
@@ -75,20 +148,21 @@ namespace SchoolyConnect
         void con_off()
         {
             foreach (TieSchedCourse c in tCourses)
-                for (int i = 1; i < _ObjectWithTimeTable.MAX_DAY; ++i)
-                    for (int j = 1; j < _ObjectWithTimeTable.MAX_SLOT; ++j)
-                        if (!c.is_on(i, j)) con_off(c.Name, i, j, "off");
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                    for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                        if (!c.is_on(d, h)) con_off(c, d, h, "off");
         }
+
+
 
         void con_ActiveOnDay(List<_Course> tHomeCourses, int d)
         {
             if (tHomeCourses.Count == 0) return;
-            Console.Write(tHomeCourses[0].Name + " = " + d);
+            Log(tHomeCourses[0].Name + " = " + d);
             for (int i = 1; i < tHomeCourses.Count; ++i)
             {
-                Console.Write("\\/" + tHomeCourses[i].Name + " = " + d);
-            }
-            Console.WriteLine();
+                Log("\\/" + tHomeCourses[i].Name + " = " + d);
+            }            
         }
 
         /// <summary>
@@ -111,7 +185,7 @@ namespace SchoolyConnect
                 {
                     bool on_thatDay = false;
                     // checking t's availability on that day
-                    for (int h = 1; h < _ObjectWithTimeTable.MAX_SLOT; ++h)
+                    for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     {
                         if (t.is_on(d,h))
                         {
@@ -125,23 +199,17 @@ namespace SchoolyConnect
             }
         }
 
-        public void Solve()
+        public SimpleCSP Translate()
         {
-            Console.WriteLine("Solving.....");
-            tCourses.ForEach(delegate (TieSchedCourse tc)
-            {
-                tc.My_private_method();
-            });
-
+            Log("Translating.....");
 
             con_noOverlap();
-
             con_off();
 
             // Soft constraints:
             con_ActiveOnDay();
 
-            SaveSolution();
+            return Csp;
         }
 
      
