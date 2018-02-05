@@ -11,7 +11,8 @@ namespace SchoolyConnect
         static void Main(string[] args)
         {
             TieSchedModel m = new TieSchedModel();
-            m.fromJSON("somefile.json");
+            /* Pass empty filename for mockup */
+            m.fromJSON("");
             m.Solve();
             Console.ReadLine();
         }
