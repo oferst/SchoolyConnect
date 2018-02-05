@@ -1,35 +1,74 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Configuration;
+using System.Data.SqlClient;
+using System.Windows.Forms;
 
-namespace SchoolyConnect
+namespace CourseScheduling
 {
-    class Program
+    /// <summary>
+    /// Class with program entry point.
+    /// </summary>
+    internal sealed class Program
     {
-        static void Main(string[] args)
-        {
-            /* display hebrew in the console window 
-               if still gibrish change the font on the command window:
-               When the console is open, right click the square on top left,
-               then properties then font and set hebrew supported font like miriam fixed.
-            */
-            Console.OutputEncoding = Encoding.UTF8;
+        
 
-            TieSchedModel m = new TieSchedModel();
-            /* Pass empty filename for mockup */
-            bool useJSONFileAndMonitor = true;
-            if (useJSONFileAndMonitor)
+        public const bool read_xml = false;   // reads the constraints from external xml file (filePath / "schedulinginfo.xml") instead of regenerating it from the db.
+        public const bool continue_on_errors = true;     // when inconsistencies in the database are discovered, skips the entry and logs it, rather than throwing an exception.     
+
+        // note that for this to work 
+        // 1) for exam scheduling the specialdays table should be correct, and the hard constraints for the exams should be updated. 
+        // 2) for class scheduling it has to be after registration info. is in. This happens in late August for winter semester, and around Feb. for spring semester.
+        // 3) It limits the 'what-to-schedule'table, and in the end empties it.         
+        public const bool make_benchmarks = false; // creates various benchmarks, copies them to the benchmarks dir, and exits.
+                
+        /// <summary>
+        /// Program entry point.
+        /// </summary>
+        [STAThread]
+        private static void Main(string[] args)  // no use for args currently
+        {
+            GlobalVar.Init(); // initializes the log file. 
+
+            if (make_benchmarks)
             {
-                string fileName = "../../data/in/arlozerov.json";
-                m.fromJSON(fileName);
-                m.Monitor();
-            } else
+                MainForm m;
+                int[] numSemesters = new int[] { 1, 3, 5, 0 }; // 0 = no limit
+                foreach (int i in numSemesters)
+                {   
+                    // here we need to implement the equivalent of Utils.populate_what_to_schedule(i);
+                    string suffix = i == 0? "" : "_" + i.ToString();
+                    m = new MainForm(new schoolScheduling());
+                    m.createBenchmarks(suffix);                      
+                }
+                MessageBox.Show("Finished generating benchmarks");
+                return;
+            }
+
+            string title = " "; 
+            List<string> schedulers = new List<string> {"לוח שעות"};
+            try
+            {              
+                Config c = new Config(schedulers, title, true);
+                if (c.ShowDialog() == DialogResult.Yes)
+                {
+                    if (GlobalVar.solutiobFile != "") 
+                        if (MessageBox.Show("This will read the solution file, and populate the tables. Continue? ", "Import", MessageBoxButtons.OKCancel) == DialogResult.Cancel) return;
+                    MainForm m = null;
+                    m = new MainForm(new schoolScheduling()); 
+                    m.ShowDialog();
+                }
+            }
+            catch (Exception ex)
             {
-                m.fromJSON("");
-                m.Solve();
-                Console.ReadLine();
+                GlobalVar.Log.WriteLine(" *** Program exited on exception:  \n message:" + ex.Message + "\nstacktrace: " + ex.StackTrace + "\nlocation: " + ex.TargetSite);                
+            }
+            GlobalVar.close_log();
+            if (GlobalVar.normal_termination)
+            {
+                Config c1 = new Config(schedulers,title, false);
+                c1.ShowDialog();
             }
         }
     }

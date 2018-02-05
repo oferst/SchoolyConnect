@@ -26,6 +26,7 @@ namespace SchoolyConnect
     class _ObjectWithTimeTable : _Object
     {
         public const int MAX_DAY = 6;
+        public const int MAX_HOUR = 10;
         public int ttTotal => tt.Cast<bool>().Sum(b => { return b ? 1 : 0; });
         protected _ObjectWithTimeTable () : base()
         {
