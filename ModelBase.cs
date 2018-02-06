@@ -131,30 +131,11 @@ namespace SchoolyConnect
         
         public bool is_on(int day, int slot) // ofer changed to public
         {
-            bool result = true;
-            if (Teachers.Count>0)
-            {
-                Teachers.ForEach(delegate (_Teacher t)
-                {
-                    result = result && t.is_on(day, slot);
-                });
-            }
+            foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
+            if (Classes != null) foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
+            if (Rooms != null) foreach (var t in Rooms) if (!t.is_on(day, slot)) return false;
 
-            if (result && Classes.Count>0)
-            {
-                Classes.ForEach(delegate (_Class c)
-                {
-                    result = result && c.is_on(day, slot);
-                });
-            }
-            if (result && Rooms.Count>0)
-            {
-                Rooms?.ForEach(delegate (_Room r)
-                {
-                    result = result && r.is_on(day, slot);
-                });
-            }
-            return result;
+            return true;            
         }
     }
 

@@ -38,10 +38,13 @@ namespace SchoolyConnect
             courseHVars.Clear();
             foreach (_Course c in tCourses)
             {
-                Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id), domDays);
-                Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id), domHours);
-                courseDVars[vd.Name] = vd;
-                courseHVars[vh.Name] = vh;
+                for (int i = 0; i < c.cHours; ++i)
+                {
+                    Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, i), domDays);
+                    Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id, i), domHours);
+                    courseDVars[vd.Name] = vd;
+                    courseHVars[vh.Name] = vh;
+                }
             }
         }
 
@@ -75,33 +78,33 @@ namespace SchoolyConnect
             GlobalVar.Log.WriteLine(v);
         }
 
-        Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID)
+        Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
         {
-            Variable v = (Variable)(day ? courseDVars : courseHVars)[CourseVarName(day, type, courseID)];
+            Variable v = (Variable)(day ? courseDVars : courseHVars)[CourseVarName(day, type, courseID, group)];
             if (v == null)
-                throw new Exception("Course metadata doesn't match course data: " + courseID + ", " + type.ToString());
+                throw new Exception("Problem with CourseVar: " + courseID + ", " + type.ToString());
             return v;
         }
 
-        string CourseVarName(bool day, COURSE_TYPE_ENUM type, string courseID)
+        string CourseVarName(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
         {
-            return (day ? "d_" : "h_") + CourseVarName(type, courseID);
+            return (day ? "d_" : "h_") + CourseVarName(type, courseID, group);
         }
 
-        string CourseVarName(COURSE_TYPE_ENUM type, string courseID)
+        string CourseVarName(COURSE_TYPE_ENUM type, string courseID, int group)
         {
-            return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_")  + courseID;
+            return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_")  + courseID + "_" + group.ToString();
         }
         
         /*************************   Constraints ***************************/
 
-        void con_noOverlap (int c1, int c2, string reason)
+        void con_noOverlap (int c1, int c2, int g1, int g2, string reason)
         {
-            Log("nooverlap(" + tCourses[c1].Name + "," + tCourses[c2].Name + "," + reason + ")");
-            Variable vd1 = CourseVar(true, tCourses[c1].Course_Type, tCourses[c1].Id);
-            Variable vd2 = CourseVar(true, tCourses[c2].Course_Type, tCourses[c2].Id);
-            Variable vh1 = CourseVar(false, tCourses[c1].Course_Type, tCourses[c1].Id);
-            Variable vh2 = CourseVar(false, tCourses[c2].Course_Type, tCourses[c2].Id);            
+            Log("nooverlap(" + tCourses[c1].Name + " group " + g1 + "," + tCourses[c2].Name + " group " + g2 + "," + reason + ")");
+            Variable vd1 = CourseVar(true, tCourses[c1].Course_Type, tCourses[c1].Id, g1);
+            Variable vd2 = CourseVar(true, tCourses[c2].Course_Type, tCourses[c2].Id, g2);
+            Variable vh1 = CourseVar(false, tCourses[c1].Course_Type, tCourses[c1].Id, g1);
+            Variable vh2 = CourseVar(false, tCourses[c2].Course_Type, tCourses[c2].Id, g2);            
 
             CompositeConstraint c;
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
@@ -120,34 +123,38 @@ namespace SchoolyConnect
             {
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
-                    /* Two F-type courses that have shared classes cannot overlap */
-                    if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
-                        (tCourses[i].Classes.Intersect(tCourses[j].Classes)).Any())
-                    {
-                        con_noOverlap(i, j, "classes");
-                        continue;
-                    }
-                    /* Two courses that have shared teachers cannot overlap */
-                    if ((tCourses[i].Teachers.Intersect(tCourses[j].Teachers)).Any())
-                    {
-                        con_noOverlap(i, j, "teachers");
-                        continue;
-                    }
-                    /* Two F-type courses that have shared rooms cannot overlap */
-                    if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
-                        tCourses[i].Rooms != null && tCourses[j].Rooms != null &&
-                        (tCourses[i].Rooms.Intersect(tCourses[j].Rooms)).Any())
-                        con_noOverlap(i,j, "rooms");
+                    for (int g1 = 0; g1 < tCourses[i].cHours; ++g1)
+                        for (int g2 = 0; g2 < tCourses[j].cHours; ++g2)
+                        {
+                            /* Two F-type courses that have shared classes cannot overlap */
+                            if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
+                                (tCourses[i].Classes.Intersect(tCourses[j].Classes)).Any())
+                            {
+                                con_noOverlap(i, j, g1, g2, "classes");
+                                continue;
+                            }
+                            /* Two courses that have shared teachers cannot overlap */
+                            if ((tCourses[i].Teachers.Intersect(tCourses[j].Teachers)).Any())
+                            {
+                                con_noOverlap(i, j,g1, g2, "teachers");
+                                continue;
+                            }
+                            /* Two F-type courses that have shared rooms cannot overlap */
+                            if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
+                                tCourses[i].Rooms != null && tCourses[j].Rooms != null &&
+                                (tCourses[i].Rooms.Intersect(tCourses[j].Rooms)).Any())
+                                con_noOverlap(i, j, g1, g2, "rooms");
+                        }
                 }
             }
         }
 
-        void con_off(_Course c1, int day, int hour, string reason)
+        void con_off(_Course c1, int group, int day, int hour, string reason)
         {
-            Log("off(" + c1.Name + "," + day + "," + hour + "," + reason + ")");
+            Log("off(" + c1.Name + " group " + group + "," + day + "," + hour + "," + reason + ")");
 
-            Variable vd = CourseVar(true, c1.Course_Type, c1.Id);
-            Variable vh = CourseVar(false, c1.Course_Type, c1.Id);
+            Variable vd = CourseVar(true, c1.Course_Type, c1.Id, group);
+            Variable vh = CourseVar(false, c1.Course_Type, c1.Id, group);
             CompositeConstraint c = new CompositeConstraint(BooleanOperator.OR,
                 new Constraint[]
                 {
@@ -164,9 +171,10 @@ namespace SchoolyConnect
         void con_off()
         {
             foreach (TieSchedCourse c in tCourses)
+                for (int g = 0; g < c.cHours; ++g)
                 for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
-                        if (!c.is_on(d, h)) con_off(c, d, h, "off");
+                        if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
         }
 
         void con_ActiveOnDay(List<_Course> tHomeCourses, int d)
@@ -232,10 +240,11 @@ namespace SchoolyConnect
         public void ExportSolution(Hashtable cspSolution)
         {
             foreach (_Course c in courses)
+                for (int g = 0; g < c.cHours; ++g)
             {
-                var d = CourseVar(true, c.Course_Type, c.Id);
+                var d = CourseVar(true, c.Course_Type, c.Id, g);
                 c.ttDay = (int)cspSolution[d];
-                var h = CourseVar(false, c.Course_Type, c.Id);
+                var h = CourseVar(false, c.Course_Type, c.Id, g);
                 c.ttHour = (int)cspSolution[h];
             }            
         }
