@@ -18,7 +18,10 @@ namespace CourseScheduling
         }
 
         override public void ExportSolution(Hashtable cspSolution)
-        {        
+        {
+            m.ExportSolution(cspSolution);
+            string receipt = m.SaveSolution(true);
+            Log("Solution sent. Receipt = " + receipt);
         }
 
         override public string name_for_benchmrks()
@@ -28,42 +31,15 @@ namespace CourseScheduling
         override public SimpleCSP TranslateToCSP() // main function for adding constraints **
         {
             m = new TieSchedModel();
-            bool useJSONFileAndMonitor = true;
+            bool useJSONFileAndMonitor = false;
             if (useJSONFileAndMonitor)
             {
                 string fileName = "../../data/in/arlozerov.json";
                 m.fromJSON(fileName);
-
-
-                /* solve it! */
-
-
-                /* populate solution */
-                bool isFinal = true;
-                m.courses.ForEach(course =>
-                {
-                    // SolutionCourse c = solution.courses.Find(x=>x.Id==course.Id);
-                    // course.ttDay  = SolutionCourse.day;
-                    // course.ttHour = SolutionCourse.hour;
-                });
-                m.clusters.ForEach(cluster =>
-                {
-                    // SolutionCluster c = Solution.clusters.Find(x=>x.Id==cluster.Id);
-                    // cluster.ttDay = SolutionCourse.day;
-                    // cluster.ttHour = SolutionCourse.hour;
-                });
-                /* send solution to Host */
-                string receipt = m.SaveSolution(isFinal);
-                
-                Console.WriteLine("Solution sent:" + receipt);
-
-               // m.Monitor();
             }
             else
             {
-                m.fromJSON("");
-                m.Translate();
-                Console.ReadLine();
+                m.fromJSON("");                
             }
             return m.Translate();
         }

@@ -123,7 +123,7 @@ namespace SchoolyConnect
 
         void con_off(_Course c1, int day, int hour, string reason)
         {
-            Log("off(" + c1 + "," + day + "," + hour + "," + reason + ")");
+            Log("off(" + c1.Name + "," + day + "," + hour + "," + reason + ")");
 
             Variable vd = CourseVar(true, c1.Course_Type, c1.Id);
             Variable vh = CourseVar(false, c1.Course_Type, c1.Id);
@@ -207,14 +207,25 @@ namespace SchoolyConnect
             con_off();
 
             // Soft constraints:
-            con_ActiveOnDay();
+            //con_ActiveOnDay();
 
             return Csp;
         }
 
-     
 
-        public void fromJSON(string fileName)
+        public void ExportSolution(Hashtable cspSolution)
+        {
+            foreach (_Course c in courses)
+            {
+                var d = CourseVar(true, c.Course_Type, c.Id);
+                c.ttDay = (int)cspSolution[d];
+                var h = CourseVar(false, c.Course_Type, c.Id);
+                c.ttHour = (int)cspSolution[h];
+            }            
+        }
+
+
+            public void fromJSON(string fileName)
         {
             Load(fileName);
             PreProcess();

@@ -525,8 +525,11 @@ namespace SchoolyConnect
                 t2.MyClass = cl2;
 
                 // on constraints: 
-                //t2.tt[3, 2] = t3.tt[1, 1] = t1.tt[1, 1] = true;
-                //cl1.tt[3, 2] = cl1.tt[1, 1] = true;
+                t3.tt[1, 1] = t1.tt[1, 1] = t4.tt[1,1] = true;
+                cl2.tt[1, 1] = cl1.tt[1, 1] = true;
+
+                t3.tt[2, 2] = t1.tt[2, 2] = true;
+                cl1.tt[2, 2] = true;
 
 
                 courses.Add(new _Course()
