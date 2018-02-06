@@ -212,14 +212,17 @@ namespace SchoolyConnect
             return Csp;
         }
 
-     
 
-        public void fromJSON(string fileName)
+        public void fromJSONString(string jsonString)
         {
-            Load(fileName);
+            LoadFromJson(jsonString);
             PreProcess();
-            
         }
 
+        public void fromJSONFile(string fileName)
+        {
+            LoadFromFile (fileName);
+            PreProcess();
+        }
     }
 }

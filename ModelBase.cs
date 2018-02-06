@@ -4,13 +4,13 @@ using System.Linq;
 using System.IO;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
-using System.Net;
-using System.Text;
 
 
 namespace SchoolyConnect
 {
     enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
+
+
 
     
 
@@ -266,13 +266,14 @@ namespace SchoolyConnect
         }
     }
 
+    
     class ModelBase
     {
         public string SchoolName { get; set; }
         public string InstiCode { get; set; }
         public string ScopeId{ get; set; }
+        public string SolutionId{ get; set; }
 
-        
 
         public  List<_Subject> subjects;
         public  List<_Class> classes;
@@ -286,6 +287,8 @@ namespace SchoolyConnect
         public  List<_Course> sCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.S);
         public  List<_Course> pCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.P);
 
+        private Connect connect;
+        
         protected ModelBase()
         {
             subjects = new List<_Subject>();
@@ -294,6 +297,8 @@ namespace SchoolyConnect
             rooms = new List<_Room>();
             courses = new List<_Course>();
             clusters = new List<_Cluster>();
+            connect = new Connect();
+        
         }
 
         _Course getCourse(string id)
@@ -391,123 +396,137 @@ namespace SchoolyConnect
                 iDay++;
             }
         }
-        public void Load(string fileName)
+
+
+        public void LoadFromJson(string jsonString)
+        {
+            JObject json = JObject.Parse(jsonString);
+            SolutionId = json["solution_id"].ToString();
+
+            JToken jSchool = json["school"];
+            SchoolName = jSchool["school_name"].ToString();
+            InstiCode = jSchool["insti_code"].ToString();
+            ScopeId = jSchool["scope_id"].ToString();
+            
+
+
+            IList<JToken> jSubjects = json["subjects"].Children().ToList();
+            foreach (JToken jSubject in jSubjects)
+            {
+                string id = jSubject["id"].ToString();
+                string name = jSubject["name"].ToString();
+                addSubject(id, name);
+            }
+
+
+            IList<JToken> jTeachers = json["teachers"].Children().ToList();
+            foreach (JToken jTeacher in jTeachers)
+            {
+                string id = jTeacher["id"].ToString();
+                string name = jTeacher["name"].ToString();
+                _Teacher teacher = addTeacher(id, name);
+                setIsOn(teacher, jTeacher);
+            }
+
+            IList<JToken> jClasses = json["classes"].Children().ToList();
+            foreach (JToken jClass in jClasses)
+            {
+                string id = jClass["id"].ToString();
+                string name = jClass["name"].ToString();
+                string teacherId = jClass["teacher"].ToString();
+                _Teacher teacher = teachers.Find(x => x.Id == teacherId);
+                _Class clazz = addClass(id, name, teacher);
+                setIsOn(clazz, jClass);
+            }
+
+
+            IList<JToken> jRooms = json["rooms"].Children().ToList();
+            foreach (JToken jRoom in jRooms)
+            {
+                string id = jRoom["id"].ToString();
+                string name = jRoom["name"].ToString();
+                _Room room = addRoom(id, name);
+                setIsOn(room, jRoom);
+            }
+
+            IList<JToken> jCourses = json["courses"].Children().ToList();
+            foreach (JToken jCourse in jCourses)
+            {
+                string id = jCourse["id"].ToString();
+                string name = jCourse["name"].ToString();
+                string subject = jCourse["subject"].ToString();
+                string course_type = jCourse["course_type"].ToString();
+                int max_daily_hours = Int32.Parse(jCourse["max_daily_hours"].ToString());
+                int hours = Int32.Parse(jCourse["hours"].ToString());
+                _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
+
+                c.Subject = subjects.Find(x => x.Id == subject.ToString());
+
+                List<JToken> class_ids = jCourse["classes"].ToList();
+                List<JToken> teacher_ids = jCourse["teachers"].ToList();
+                List<JToken> room_ids = jCourse["rooms"].ToList();
+
+                class_ids.ForEach(class_id =>
+                {
+                    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                    if (cl != null)
+                    {
+                        c.Classes.Add(cl);
+                    }
+
+                });
+
+                teacher_ids.ForEach(teacher_id =>
+                {
+                    _Teacher t = teachers.Find(teacher => teacher.Id == teacher_id.ToString());
+                    if (t != null)
+                    {
+                        c.Teachers.Add(t);
+                    }
+
+                });
+
+                room_ids.ForEach(room_id =>
+                {
+                    _Room r = rooms.Find(room => room.Id == room_id.ToString());
+                    if (r != null)
+                    {
+                        c.Rooms.Add(r);
+                    }
+                });
+            }
+
+            IList<JToken> jClusters = json["clusters"].Children().ToList();
+            foreach (JToken jCluster in jClusters)
+            {
+                string id = jCluster["id"].ToString();
+                string name = jCluster["name"].ToString();
+                List<JToken> course_ids = jCluster["courses"].ToList();
+                _Cluster cluster = addCluster(id, name);
+                course_ids.ForEach(course_id =>
+                {
+                    _Course c = getCourse(course_id.ToString());
+                    c.Clusters.Add(cluster);
+                    cluster.Courses.Add(c);
+
+                });
+            }
+
+
+
+
+        }
+
+
+        public void LoadFromFile(string fileName)
         {
             if (fileName != "")
             {
                 using (StreamReader stm = new StreamReader(fileName))
                 {
-                    JObject json = JObject.Parse(stm.ReadToEnd());
+                    LoadFromJson(stm.ReadToEnd());
 
-                    JToken jSchool = json["school"];
-                    SchoolName = jSchool["school_name"].ToString();
-                    InstiCode  = jSchool["insti_code"].ToString();
-                    ScopeId    = jSchool["scope_id"].ToString();
-
-
-
-
-                    IList <JToken> jSubjects = json["subjects"].Children().ToList();
-                    foreach (JToken jSubject in jSubjects)
-                    {
-                        string id = jSubject["id"].ToString();
-                        string name = jSubject["name"].ToString();
-                        addSubject(id, name);
-                    }
-
-
-                    IList<JToken> jTeachers = json["teachers"].Children().ToList();
-                    foreach (JToken jTeacher in jTeachers)
-                    {
-                        string id = jTeacher["id"].ToString();
-                        string name = jTeacher["name"].ToString();
-                        _Teacher teacher = addTeacher(id, name);
-                        setIsOn(teacher, jTeacher);
-                    }
-
-                    IList<JToken> jClasses = json["classes"].Children().ToList();
-                    foreach (JToken jClass in jClasses)
-                    {
-                        string id = jClass["id"].ToString();
-                        string name = jClass["name"].ToString();
-                        string teacherId = jClass["teacher"].ToString();
-                        _Teacher teacher = teachers.Find(x => x.Id == teacherId);
-                        _Class clazz = addClass(id, name, teacher);
-                        setIsOn(clazz, jClass);
-                    }
-
-
-                    IList<JToken> jRooms = json["rooms"].Children().ToList();
-                    foreach (JToken jRoom in jRooms)
-                    {
-                        string id = jRoom["id"].ToString();
-                        string name = jRoom["name"].ToString();
-                        _Room room = addRoom(id, name);
-                        setIsOn(room, jRoom);
-                    }
-
-                    IList<JToken> jCourses = json["courses"].Children().ToList();
-                    foreach (JToken jCourse in jCourses)
-                    {
-                        string id = jCourse["id"].ToString();
-                        string name = jCourse["name"].ToString();
-                        string subject = jCourse["subject"].ToString();
-                        string course_type = jCourse["course_type"].ToString();
-                        int max_daily_hours = Int32.Parse(jCourse["max_daily_hours"].ToString());
-                        int hours = Int32.Parse(jCourse["hours"].ToString());
-                        _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
-
-                        c.Subject = subjects.Find(x => x.Id == subject.ToString());
-
-                        List<JToken> class_ids = jCourse["classes"].ToList();
-                        List<JToken> teacher_ids = jCourse["teachers"].ToList();
-                        List<JToken> room_ids = jCourse["rooms"].ToList();
-
-                        class_ids.ForEach(class_id =>
-                        {
-                            _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
-                            if (cl != null)
-                            {
-                                c.Classes.Add(cl);
-                            }
-
-                        });
-
-                        teacher_ids.ForEach(teacher_id =>
-                        {
-                            _Teacher t = teachers.Find(teacher => teacher.Id == teacher_id.ToString());
-                            if (t != null)
-                            {
-                                c.Teachers.Add(t);
-                            }
-
-                        });
-
-                        room_ids.ForEach(room_id =>
-                        {
-                            _Room r = rooms.Find(room => room.Id == room_id.ToString());
-                            if (r != null)
-                            {
-                                c.Rooms.Add(r);
-                            }
-                        });
-                    }
-
-                    IList<JToken> jClusters = json["clusters"].Children().ToList();
-                    foreach (JToken jCluster in jClusters)
-                    {
-                        string id = jCluster["id"].ToString();
-                        string name = jCluster["name"].ToString();
-                        List<JToken> course_ids = jCluster["courses"].ToList();
-                        _Cluster cluster = addCluster(id, name);
-                        course_ids.ForEach(course_id =>
-                        {
-                            _Course c = getCourse(course_id.ToString());
-                            c.Clusters.Add(cluster);
-                            cluster.Courses.Add(c);
-
-                        });
-                    }
+                    
                 }
             } else
             {
@@ -751,13 +770,13 @@ namespace SchoolyConnect
 
         class SolutionLine
         {
-            public string id { get; set; }
+            public string group_id { get; set; }
             public int day { get; set; }
             public int slot { get; set; }
 
             public SolutionLine(string aId, int aDay, int aSlot)
             {
-                id = aId;
+                group_id = aId;
                 day = aDay;
                 slot = aSlot;
             }
@@ -765,62 +784,35 @@ namespace SchoolyConnect
 
         class Solution {
             public bool isFinal { get; set; }
-            public string scope_id { get; set; }
+            public string solution_id {get; set; }
             public List<SolutionLine> courses { get; set; }
-            public List<SolutionLine> clusters { get; set; }
-            public Solution(string scopeId, bool final)
+            public Solution(string SolutionId, bool final)
             {
-                scope_id = scopeId;
+                solution_id = SolutionId;
                 isFinal = final;
                 courses = new List<SolutionLine>();
-                clusters = new List<SolutionLine>();
             }
         }
 
 
+        
+
         public string SaveSolution(bool final)
         {
-            Solution solution = new Solution(ScopeId,final);
+            Solution solution = new Solution(SolutionId, final);
             courses.ForEach(course =>
             {
                 solution.courses.Add(new SolutionLine(course.Id, course.ttDay, course.ttHour));
             });
-            clusters.ForEach(cluster =>
-            {
-                solution.clusters.Add(new SolutionLine(cluster.Id, cluster.ttDay, cluster.ttHour));
-            });
 
             string postData  = JsonConvert.SerializeObject(solution);
-            string responseFromServer = "";
-            try
-            {
-                //WebRequest request = WebRequest.Create("http://dev.schooly.co.il:3000/schedule/solution");
-                WebRequest request = WebRequest.Create("https://my-bg.schooly.co.il/schedule/solution");
-                request.Method = "POST";
-                byte[] byteArray = Encoding.UTF8.GetBytes(postData);
-                //request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentType = "application/json";
-                request.ContentLength = byteArray.Length;
-                Stream dataStream = request.GetRequestStream();
-                dataStream.Write(byteArray, 0, byteArray.Length);
-                dataStream.Close();
-                WebResponse response = request.GetResponse();
-                dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream);
-                responseFromServer = reader.ReadToEnd();
-                reader.Close();
-                dataStream.Close();
-                response.Close();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Exception sending solution", ex.Message);
-            }
-            return responseFromServer;
+
+            return connect.Http("solution/save", postData);
         }
     }
 }
 
     internal class Array<T>
     {
-    }
+
+}   
