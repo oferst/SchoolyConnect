@@ -231,13 +231,28 @@ namespace SchoolyConnect
 
         public void ExportSolution(Hashtable cspSolution)
         {
+            /* Courses */
             foreach (_Course c in courses)
             {
                 var d = CourseVar(true, c.Course_Type, c.Id);
-                c.ttDay = (int)cspSolution[d];
                 var h = CourseVar(false, c.Course_Type, c.Id);
-                c.ttHour = (int)cspSolution[h];
-            }            
+                //c.ttDay = (int)cspSolution[d];
+                //c.ttHour = (int)cspSolution[h];
+                c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
+            }
+
+            /* Clusters */
+            foreach (_Cluster cluster in clusters)
+            {
+                foreach (_Course c in cluster.Courses)
+                {
+                    //var d = CourseVar(true, c.Course_Type, c.Id);
+                    //var h = CourseVar(false, c.Course_Type, c.Id);
+                    //c.ttDay = (int)cspSolution[d];
+                    //c.ttHour = (int)cspSolution[h];
+                    //c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
+                }
+            }
         }
     
     }

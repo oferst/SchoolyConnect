@@ -11,8 +11,20 @@ namespace SchoolyConnect
     enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
 
 
+    class SolutionLine
+    {
+        public string group_id { get; set; }
+        public int day { get; set; }
+        public int slot { get; set; }
 
-    
+        public SolutionLine(string aId, int aDay, int aSlot)
+        {
+            group_id = aId;
+            day = aDay;
+            slot = aSlot;
+        }
+    }
+
 
     class _Object
     {
@@ -105,10 +117,11 @@ namespace SchoolyConnect
         public List<_Class> Classes { get; set; }
         public List<_Room> Rooms { get; set; }
         public List<_Cluster> Clusters { get; set; }
-
+        public List<SolutionLine> Solution { get; set; }
+        
         /******* From Solver ************/
-        public int ttDay { get; set; }
-        public int ttHour {get; set; }
+        //public int ttDay { get; set; }
+        //public int ttHour {get; set; }
         /*******************************/
         
         public _Course() : base()
@@ -118,6 +131,9 @@ namespace SchoolyConnect
             Classes = new List<_Class>();
             Rooms = new List<_Room>();
             Clusters = new List<_Cluster>();
+            Solution = new List<SolutionLine>();
+
+        
         }
 
         public _Course(_Course c) : base()
@@ -129,6 +145,11 @@ namespace SchoolyConnect
             }
         }
         
+        public void AddSolutionLine(int Day, int Slot)
+        {
+            Solution.Add(new SolutionLine(Id,Day,Slot));
+        }
+
         public bool is_on(int day, int slot) // ofer changed to public
         {
             bool result = true;
@@ -771,19 +792,7 @@ namespace SchoolyConnect
         }
 
 
-        class SolutionLine
-        {
-            public string group_id { get; set; }
-            public int day { get; set; }
-            public int slot { get; set; }
-
-            public SolutionLine(string aId, int aDay, int aSlot)
-            {
-                group_id = aId;
-                day = aDay;
-                slot = aSlot;
-            }
-        }
+        
 
         class Solution {
             public bool isFinal { get; set; }
@@ -805,11 +814,12 @@ namespace SchoolyConnect
             Solution solution = new Solution(SolutionId, final);
             courses.ForEach(course =>
             {
-                solution.courses.Add(new SolutionLine(course.Id, course.ttDay, course.ttHour));
+                course.Solution.ForEach(sl =>
+                {
+                    solution.courses.Add(new SolutionLine(sl.group_id, sl.day, sl.slot));
+                });
             });
-
             string postData  = JsonConvert.SerializeObject(solution);
-
             return connect.Http("solution/save", postData);
         }
     }
