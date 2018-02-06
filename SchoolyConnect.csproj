@@ -54,6 +54,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Connect.cs" />
     <Compile Include="Model.cs" />
     <Compile Include="ModelBase.cs" />
     <Compile Include="Program.cs" />

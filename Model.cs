@@ -27,6 +27,7 @@ namespace SchoolyConnect
 
         SimpleCSP Csp;
 
+        /*************************   Init ***************************/
 
         void InitVariables()
         {
@@ -44,7 +45,7 @@ namespace SchoolyConnect
             }
         }
 
-            public void PreProcess()
+        public void PreProcess()
         {
             tCourses = new List<TieSchedCourse>(courses.Count);
             courses.ForEach(delegate (_Course c)
@@ -53,6 +54,25 @@ namespace SchoolyConnect
             });
             InitVariables();
             Csp = new SimpleCSP();
+        }
+
+        public void fromJSONString(string jsonString)
+        {
+            LoadFromJson(jsonString);
+            PreProcess();
+        }
+
+        public void fromJSONFile(string fileName)
+        {
+            LoadFromFile(fileName);
+            PreProcess();
+        }
+
+        /*************************   Utils ***************************/
+
+        private void Log(string v)
+        {
+            GlobalVar.Log.WriteLine(v);
         }
 
         Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID)
@@ -72,7 +92,8 @@ namespace SchoolyConnect
         {
             return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_")  + courseID;
         }
-
+        
+        /*************************   Constraints ***************************/
 
         void con_noOverlap (int c1, int c2, string reason)
         {
@@ -137,11 +158,6 @@ namespace SchoolyConnect
             Csp.Constraints.Add(c);
         }
 
-        private void Log(string v)
-        {
-            GlobalVar.Log.WriteLine(v);
-        }
-
         /// <summary>
         /// 'on' constraints 
         /// </summary>
@@ -152,8 +168,6 @@ namespace SchoolyConnect
                     for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                         if (!c.is_on(d, h)) con_off(c, d, h, "off");
         }
-
-
 
         void con_ActiveOnDay(List<_Course> tHomeCourses, int d)
         {
@@ -199,6 +213,8 @@ namespace SchoolyConnect
             }
         }
 
+        /*************************   TieLib interface ***************************/
+
         public SimpleCSP Translate()
         {
             Log("Translating.....");
@@ -223,14 +239,6 @@ namespace SchoolyConnect
                 c.ttHour = (int)cspSolution[h];
             }            
         }
-
-
-            public void fromJSON(string fileName)
-        {
-            Load(fileName);
-            PreProcess();
-            
-        }
-
+    
     }
 }
