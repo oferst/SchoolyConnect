@@ -794,7 +794,8 @@ namespace SchoolyConnect
             string responseFromServer = "";
             try
             {
-                WebRequest request = WebRequest.Create("http://dev.schooly.co.il:3000/schedule/solution");
+                //WebRequest request = WebRequest.Create("http://dev.schooly.co.il:3000/schedule/solution");
+                WebRequest request = WebRequest.Create("https://my-bg.schooly.co.il/schedule/solution");
                 request.Method = "POST";
                 byte[] byteArray = Encoding.UTF8.GetBytes(postData);
                 //request.ContentType = "application/x-www-form-urlencoded";
