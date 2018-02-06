@@ -33,6 +33,30 @@ namespace CourseScheduling
             {
                 string fileName = "../../data/in/arlozerov.json";
                 m.fromJSON(fileName);
+
+
+                /* solve it! */
+
+
+                /* populate solution */
+                bool isFinal = true;
+                m.courses.ForEach(course =>
+                {
+                    // SolutionCourse c = solution.courses.Find(x=>x.Id==course.Id);
+                    // course.ttDay  = SolutionCourse.day;
+                    // course.ttHour = SolutionCourse.hour;
+                });
+                m.clusters.ForEach(cluster =>
+                {
+                    // SolutionCluster c = Solution.clusters.Find(x=>x.Id==cluster.Id);
+                    // cluster.ttDay = SolutionCourse.day;
+                    // cluster.ttHour = SolutionCourse.hour;
+                });
+                /* send solution to Host */
+                string receipt = m.SaveSolution(isFinal);
+                
+                Console.WriteLine("Solution sent:" + receipt);
+
                // m.Monitor();
             }
             else

@@ -3,11 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using System.Net;
+using System.Text;
 
 
 namespace SchoolyConnect
 {
     enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
+
+    
 
     class _Object
     {
@@ -101,8 +106,11 @@ namespace SchoolyConnect
         public List<_Room> Rooms { get; set; }
         public List<_Cluster> Clusters { get; set; }
 
-
-
+        /******* From Solver ************/
+        public int ttDay { get; set; }
+        public int ttHour {get; set; }
+        /*******************************/
+        
         public _Course() : base()
         {
             Subject = null;
@@ -154,6 +162,12 @@ namespace SchoolyConnect
 
     class _Cluster : _Object
     {
+        /******* From Solver ************/
+        public int ttDay { get; set; }
+        public int ttHour { get; set; }
+        /*********************************/
+        
+
         public List<_Course> Courses { get; set; }
 
         public int Hours
@@ -252,7 +266,7 @@ namespace SchoolyConnect
         }
     }
 
-class ModelBase
+    class ModelBase
     {
         public string SchoolName { get; set; }
         public string InstiCode { get; set; }
@@ -733,10 +747,79 @@ class ModelBase
             while (key.Key != ConsoleKey.Escape);
             Console.WriteLine("Bye...");
         }
-        public void SaveSolution()
+
+
+        class SolutionLine
         {
-            Console.WriteLine("Thank You! ");
+            public string id { get; set; }
+            public int day { get; set; }
+            public int slot { get; set; }
+
+            public SolutionLine(string aId, int aDay, int aSlot)
+            {
+                id = aId;
+                day = aDay;
+                slot = aSlot;
+            }
+        }
+
+        class Solution {
+            public bool isFinal { get; set; }
+            public string scope_id { get; set; }
+            public List<SolutionLine> courses { get; set; }
+            public List<SolutionLine> clusters { get; set; }
+            public Solution(string scopeId, bool final)
+            {
+                scope_id = scopeId;
+                isFinal = final;
+                courses = new List<SolutionLine>();
+                clusters = new List<SolutionLine>();
+            }
+        }
+
+
+        public string SaveSolution(bool final)
+        {
+            Solution solution = new Solution(ScopeId,final);
+            courses.ForEach(course =>
+            {
+                solution.courses.Add(new SolutionLine(course.Id, course.ttDay, course.ttHour));
+            });
+            clusters.ForEach(cluster =>
+            {
+                solution.clusters.Add(new SolutionLine(cluster.Id, cluster.ttDay, cluster.ttHour));
+            });
+
+            string postData  = JsonConvert.SerializeObject(solution);
+            string responseFromServer = "";
+            try
+            {
+                WebRequest request = WebRequest.Create("http://dev.schooly.co.il:3000/schedule/solution");
+                request.Method = "POST";
+                byte[] byteArray = Encoding.UTF8.GetBytes(postData);
+                //request.ContentType = "application/x-www-form-urlencoded";
+                request.ContentType = "application/json";
+                request.ContentLength = byteArray.Length;
+                Stream dataStream = request.GetRequestStream();
+                dataStream.Write(byteArray, 0, byteArray.Length);
+                dataStream.Close();
+                WebResponse response = request.GetResponse();
+                dataStream = response.GetResponseStream();
+                StreamReader reader = new StreamReader(dataStream);
+                responseFromServer = reader.ReadToEnd();
+                reader.Close();
+                dataStream.Close();
+                response.Close();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Exception sending solution", ex.Message);
+            }
+            return responseFromServer;
         }
     }
 }
 
+    internal class Array<T>
+    {
+    }
