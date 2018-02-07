@@ -38,7 +38,7 @@ namespace SchoolyConnect
             courseHVars.Clear();
             foreach (_Course c in tCourses)
             {
-                for (int i = 0; i < c.cHours; ++i)
+                for (int i = 0; i < c.Hours; ++i)
                 {
                     Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, i), domDays);
                     Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id, i), domHours);
@@ -119,13 +119,34 @@ namespace SchoolyConnect
         /// </summary>
         void con_noOverlap()
         {
+            // groups of the same course
+            for (int i = 0; i < tCourses.Count; ++i)
+                for (int g1 = 0; g1 < tCourses[i].Hours - 1; ++g1)
+                    for (int g2 = g1 + 1; g2 < tCourses[i].Hours; ++g2)
+                    {
+                        con_noOverlap(i, i, g1, g2, "groups");
+                    }
+
+            // groups of pairs of courses
             for (int i = 0; i < tCourses.Count - 1; ++i)
             {
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
                     _Course c1 = tCourses[i], c2 = tCourses[j];
-                    for (int g1 = 0; g1 < c1.cHours; ++g1)
-                        for (int g2 = 0; g2 < c2.cHours; ++g2)
+                    bool sameCluster = false;
+                    //if the two courses share a cluster, then no nooverlap constraint. 
+                    foreach (_Cluster cl in c1.Clusters) {
+                        foreach (_Course c in cl.Courses)
+                        if (c.Id == c2.Id)
+                        {
+                            sameCluster = true;
+                            break;
+                        }                    
+                    }
+                    if (sameCluster) continue;
+
+                    for (int g1 = 0; g1 < c1.Hours; ++g1)
+                        for (int g2 = 0; g2 < c2.Hours; ++g2)
                         {
                             
                             /* Two F-type courses that have shared classes cannot overlap */
@@ -175,7 +196,7 @@ namespace SchoolyConnect
         void con_off()
         {
             foreach (TieSchedCourse c in tCourses)
-                for (int g = 0; g < c.cHours; ++g)
+                for (int g = 0; g < c.Hours; ++g)
                 for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                         if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
@@ -203,7 +224,7 @@ namespace SchoolyConnect
                 for (int i = 0; i < cluster.Courses.Count - 1; ++i)
                     {
                         _Course c1 = cluster.Courses[i], c2 = cluster.Courses[i+1];
-                        int min = Math.Min(c1.cHours, c2.cHours);
+                        int min = Math.Min(c1.Hours, c2.Hours);
                         for (int k = 0; k<min;++k)
                         {
                             con_Cluster(c1, c2, k, k, "cluster " + cluster.Name);
@@ -275,25 +296,12 @@ namespace SchoolyConnect
         {
             /* Courses */
             foreach (_Course c in courses)
-                for (int g = 0; g < c.cHours; ++g)
+                for (int g = 0; g < c.Hours; ++g)
             {
                     var d = CourseVar(true, c.Course_Type, c.Id, g);
                     var h = CourseVar(false, c.Course_Type, c.Id, g);
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
-            }
-
-            /* Clusters */
-            foreach (_Cluster cluster in clusters)
-            {
-                foreach (_Course c in cluster.Courses)
-                {
-                    //var d = CourseVar(true, c.Course_Type, c.Id);
-                    //var h = CourseVar(false, c.Course_Type, c.Id);
-                    //c.ttDay = (int)cspSolution[d];
-                    //c.ttHour = (int)cspSolution[h];
-                    //c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
-                }
-            }
+            }            
         }
     }
 }

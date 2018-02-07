@@ -328,14 +328,12 @@ namespace SchoolyConnect
             return clusters.Find(x => x.Id == id.ToString());
         }
 
-
         _Subject addSubject(string id, string name)
         {
             _Subject subject = new _Subject() { Name = name, Id = id };
             subjects.Add(subject);
             return subject;
         }
-
 
         _Teacher addTeacher(string id,string name)
         {
@@ -359,7 +357,6 @@ namespace SchoolyConnect
             return r;
         }
 
-
         _Course addCourse(string id, string name, string course_type, int hours, int max_daily_hours)
         {
             _Course c = new _Course() {
@@ -379,7 +376,7 @@ namespace SchoolyConnect
             clusters.Add(c);
             return c;
         }
-        
+       
 
 
 
@@ -456,6 +453,10 @@ namespace SchoolyConnect
             {
                 string id = jCourse["id"].ToString();
                 string name = jCourse["name"].ToString();
+
+                // filterring 
+                // if (!name.Contains("א1")) continue;
+
                 string subject = jCourse["subject"].ToString();
                 string course_type = jCourse["course_type"].ToString();
                 int max_daily_hours = Int32.Parse(jCourse["max_daily_hours"].ToString());
@@ -507,9 +508,13 @@ namespace SchoolyConnect
                 _Cluster cluster = addCluster(id, name);
                 course_ids.ForEach(course_id =>
                 {
-                    _Course c = getCourse(course_id.ToString());
-                    c.Clusters.Add(cluster);
-                    cluster.Courses.Add(c);
+                    try
+                    {
+                        _Course c = getCourse(course_id.ToString());
+                        c.Clusters.Add(cluster);
+                        cluster.Courses.Add(c);
+                    }
+                    catch { } // for when I screen te courses. 
 
                 });
             }
@@ -800,6 +805,7 @@ namespace SchoolyConnect
                     solution.courses.Add(new SolutionLine(sl.group_id, sl.day, sl.slot));
                 });
             });
+
             string postData  = JsonConvert.SerializeObject(solution);
             return connect.Http("solution/save", postData);
         }
