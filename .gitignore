@@ -261,3 +261,4 @@ __pycache__/
 *.pyc
 CodeGraphData/
 .gitattributes
+_Model.cs

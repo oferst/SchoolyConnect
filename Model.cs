@@ -123,26 +123,30 @@ namespace SchoolyConnect
             {
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
-                    for (int g1 = 0; g1 < tCourses[i].cHours; ++g1)
-                        for (int g2 = 0; g2 < tCourses[j].cHours; ++g2)
+                    _Course c1 = tCourses[i], c2 = tCourses[j];
+                    for (int g1 = 0; g1 < c1.cHours; ++g1)
+                        for (int g2 = 0; g2 < c2.cHours; ++g2)
                         {
+                            
                             /* Two F-type courses that have shared classes cannot overlap */
-                            if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
-                                (tCourses[i].Classes.Intersect(tCourses[j].Classes)).Any())
+                            if (c1.Course_Type == COURSE_TYPE_ENUM.F && c2.Course_Type == COURSE_TYPE_ENUM.F &&
+                                (c1.Classes.Intersect(c2.Classes)).Any())
                             {
-                                con_noOverlap(i, j, g1, g2, "classes");
+                                string cl = c1.Classes.Intersect(c2.Classes).First().Name;
+                                con_noOverlap(i, j, g1, g2, "classes (e.g., " + cl+")");
                                 continue;
                             }
                             /* Two courses that have shared teachers cannot overlap */
-                            if ((tCourses[i].Teachers.Intersect(tCourses[j].Teachers)).Any())
+                            if ((c1.Teachers.Intersect(c2.Teachers)).Any())
                             {
-                                con_noOverlap(i, j,g1, g2, "teachers");
+                                string t = c1.Teachers.Intersect(c2.Teachers).First().Name;
+                                con_noOverlap(i, j,g1, g2, "teachers (e.g., " + t+ ")");
                                 continue;
                             }
                             /* Two F-type courses that have shared rooms cannot overlap */
-                            if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
-                                tCourses[i].Rooms != null && tCourses[j].Rooms != null &&
-                                (tCourses[i].Rooms.Intersect(tCourses[j].Rooms)).Any())
+                            if (c1.Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
+                                c1.Rooms != null && tCourses[j].Rooms != null &&
+                                (c1.Rooms.Intersect(tCourses[j].Rooms)).Any())
                                 con_noOverlap(i, j, g1, g2, "rooms");
                         }
                 }
@@ -175,6 +179,36 @@ namespace SchoolyConnect
                 for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                         if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
+        }
+
+        void con_Cluster(_Course c1, _Course c2, int g1, int g2, string reason)
+        {
+            Log("cluster-overlap(" + c1.Name + " group " + g1 + "," + c2.Name + " group " + g2 + "," + reason + ")");
+            Variable vd1 = CourseVar(true, c1.Course_Type, c1.Id, g1);
+            Variable vd2 = CourseVar(true, c2.Course_Type, c2.Id, g2);
+            Variable vh1 = CourseVar(false, c1.Course_Type, c1.Id, g1);
+            Variable vh2 = CourseVar(false, c2.Course_Type, c2.Id, g2);
+
+            CompositeConstraint c;
+            c = new CompositeConstraint(BooleanOperator.AND, new Constraint[]{
+                                            new VarVarConstraint(vd1, vd2, ArithmeticalOperator.EQ),
+                                            new VarVarConstraint(vh1, vh2, ArithmeticalOperator.EQ) });
+            c.NegativeDisplayString = reason + ": cluster-overlap (" + c1.Name + "," + c2.Name + ") ";
+            Csp.Constraints.Add(c);
+        }
+
+        void con_clusters()
+        {
+            foreach (_Cluster cluster in clusters) 
+                for (int i = 0; i < cluster.Courses.Count - 1; ++i)
+                    {
+                        _Course c1 = cluster.Courses[i], c2 = cluster.Courses[i+1];
+                        int min = Math.Min(c1.cHours, c2.cHours);
+                        for (int k = 0; k<min;++k)
+                        {
+                            con_Cluster(c1, c2, k, k, "cluster " + cluster.Name);
+                        }
+                    }                      
         }
 
         void con_ActiveOnDay(List<_Course> tHomeCourses, int d)
@@ -229,7 +263,7 @@ namespace SchoolyConnect
 
             con_noOverlap();
             con_off();
-
+            con_clusters();
             // Soft constraints:
             //con_ActiveOnDay();
 
