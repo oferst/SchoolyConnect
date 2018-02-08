@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using CourseScheduling;
 using System.Collections;
+using System.Diagnostics;
 
 namespace SchoolyConnect
 {
@@ -121,11 +122,14 @@ namespace SchoolyConnect
         {
             // groups of the same course
             for (int i = 0; i < tCourses.Count; ++i)
+            {
+                if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.R) continue;
                 for (int g1 = 0; g1 < tCourses[i].Hours - 1; ++g1)
                     for (int g2 = g1 + 1; g2 < tCourses[i].Hours; ++g2)
                     {
                         con_noOverlap(i, i, g1, g2, "groups");
                     }
+            }
 
             // groups of pairs of courses
             for (int i = 0; i < tCourses.Count - 1; ++i)
@@ -133,6 +137,7 @@ namespace SchoolyConnect
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
                     _Course c1 = tCourses[i], c2 = tCourses[j];
+                    if (c1.Course_Type == COURSE_TYPE_ENUM.R || c2.Course_Type == COURSE_TYPE_ENUM.R) continue;
                     bool sameCluster = false;
                     //if the two courses share a cluster, then no nooverlap constraint. 
                     foreach (_Cluster cl in c1.Clusters) {
@@ -276,6 +281,20 @@ namespace SchoolyConnect
             }
         }
 
+
+        /// <summary>
+        /// Mark all but the first course in each cluster as type 'R'. We will later ignore these courses in the constraints. 
+        /// </summary>
+        void filterClusterCourses()
+        {
+            foreach (_Cluster cluster in clusters)
+                for (int i = 1; i < cluster.Courses.Count; ++i)
+                {
+                    cluster.Courses[i].Course_Type = COURSE_TYPE_ENUM.R;
+                    Debug.Assert(cluster.Courses[i].Clusters.Count == 1); // does not makes sense that a course is in more than one cluster (because then we can unite the clusters)
+                }
+        }
+
         /*************************   TieLib interface ***************************/
 
         public SimpleCSP Translate()
@@ -284,7 +303,12 @@ namespace SchoolyConnect
 
             con_noOverlap();
             con_off();
-            con_clusters();
+
+            // Either this:
+            // con_clusters();
+            // or this: 
+            filterClusterCourses();
+
             // Soft constraints:
             //con_ActiveOnDay();
 
@@ -298,8 +322,11 @@ namespace SchoolyConnect
             foreach (_Course c in courses)
                 for (int g = 0; g < c.Hours; ++g)
             {
-                    var d = CourseVar(true, c.Course_Type, c.Id, g);
-                    var h = CourseVar(false, c.Course_Type, c.Id, g);
+                    _Course course = c;
+                    // completing missing assignment for type-R courses.
+                    if (c.Course_Type == COURSE_TYPE_ENUM.R) course = c.Clusters[0].Courses[0]; // taking the schedule of the cluster's representative. 
+                    var d = CourseVar(true, course.Course_Type, course.Id, g);
+                    var h = CourseVar(false, course.Course_Type, course.Id, g);
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
             }            
         }

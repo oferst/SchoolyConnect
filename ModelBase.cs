@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 
 namespace SchoolyConnect
 {
-    enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
+    enum COURSE_TYPE_ENUM { F=1,S=2,P=3, R=4}; // R = part of a cluster and being ignored for now. 
 
 
     class SolutionLine
