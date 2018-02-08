@@ -33,12 +33,26 @@ namespace SchoolyConnect
         void InitVariables()
         {
             Domain domDays = new Domain(0, _ObjectWithTimeTable.MAX_DAY-1);
-            Domain domHours = new Domain(0, _ObjectWithTimeTable.MAX_HOUR-1);            
 
             courseDVars.Clear();
             courseHVars.Clear();
+            
             foreach (_Course c in tCourses)
             {
+                int maxHour = 0;
+                // find the maximal hour relevant for this course
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                {
+                    for (int h = _ObjectWithTimeTable.MAX_HOUR - 1; h >= 0; --h)
+                        if (c.is_on(d, h))
+                        {
+                            maxHour = Math.Max(maxHour, h);
+                            break;
+                        }
+                }
+
+                Domain domHours = new Domain(0, maxHour); // note that we are 0-based.
+
                 for (int i = 0; i < c.Hours; ++i)
                 {
                     Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, i), domDays);
@@ -111,6 +125,7 @@ namespace SchoolyConnect
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
                                             new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
+            c.Weight = 1;
             c.NegativeDisplayString = reason + ": no-overlap (" + tCourses[c1].Name + "," + tCourses[c2].Name+") ";
             Csp.Constraints.Add(c);
         }
@@ -201,10 +216,13 @@ namespace SchoolyConnect
         void con_off()
         {
             foreach (TieSchedCourse c in tCourses)
+            {
+                if (c.Course_Type == COURSE_TYPE_ENUM.R) continue;
                 for (int g = 0; g < c.Hours; ++g)
-                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
-                    for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
-                        if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
+                    for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                        for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                            if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
+            }
         }
 
         void con_Cluster(_Course c1, _Course c2, int g1, int g2, string reason)

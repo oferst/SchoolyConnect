@@ -4,7 +4,7 @@ using System.Linq;
 using System.IO;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
-
+using System.Windows.Forms;
 
 namespace SchoolyConnect
 {
@@ -43,7 +43,7 @@ namespace SchoolyConnect
     class _ObjectWithTimeTable : _Object
     {
         public const int MAX_DAY = 6;
-        public const int MAX_HOUR = 10;
+        public const int MAX_HOUR = 8;
         public int ttTotal => tt.Cast<bool>().Sum(b => { return b ? 1 : 0; });
         protected _ObjectWithTimeTable () : base()
         {
@@ -389,6 +389,7 @@ namespace SchoolyConnect
                 int iSlot = 0;
                 foreach (JToken jSlot in jDay.ToList())
                 {
+                    if (iSlot == _ObjectWithTimeTable.MAX_HOUR) break; // in case we restrict hours more than in the input file
                     o.tt[iDay, iSlot] = (jSlot.ToString() == "1" || jSlot.ToString() == "true");
                     iSlot++;
                 }
@@ -449,23 +450,56 @@ namespace SchoolyConnect
             }
 
             IList<JToken> jCourses = json["courses"].Children().ToList();
+            bool warned_filter = false;
             foreach (JToken jCourse in jCourses)
             {
                 string id = jCourse["id"].ToString();
                 string name = jCourse["name"].ToString();
-
-                // filterring 
-                // if (!name.Contains("א1")) continue;
+                               
 
                 string subject = jCourse["subject"].ToString();
                 string course_type = jCourse["course_type"].ToString();
                 int max_daily_hours = Int32.Parse(jCourse["max_daily_hours"].ToString());
                 int hours = Int32.Parse(jCourse["hours"].ToString());
+                List<JToken> class_ids = jCourse["classes"].ToList();
+
+                // filterring 
+                /*************************************************/
+                // if (!name.Contains("א1")) continue;
+                if (course_type == "S") continue;
+
+
+                // in 'p' and 's' courses there are no classes hence the 
+                // filter below (the else part) would filter it. 
+                /* 
+                 * bool ok = false;
+                  if (course_type != "F") ok = true; 
+                                else
+                                    class_ids.ForEach(class_id =>
+                                {
+                                    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                                    if (
+                                        cl.Name.Contains("א") 
+                                    ||  cl.Name.Contains("ב")
+                                    )                   
+                                        ok = true;                                            
+                                });
+
+                                if (!ok)
+                                {
+                                    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
+                                    warned_filter = true;
+                                    continue;
+                                }
+                                 */
+                /*************************************************/
+
+
+
                 _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
 
                 c.Subject = subjects.Find(x => x.Id == subject.ToString());
-
-                List<JToken> class_ids = jCourse["classes"].ToList();
+                                        
                 List<JToken> teacher_ids = jCourse["teachers"].ToList();
                 List<JToken> room_ids = jCourse["rooms"].ToList();
 
