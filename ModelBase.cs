@@ -81,8 +81,9 @@ namespace SchoolyConnect
         public _Class MyClass { get => myClass; set => myClass = value; }
         public _Teacher() : base() // ofer changed to public
         {
-            
+            freeDay = -1;
         }
+        public int freeDay; // ofer
     }
     class _Class : _ObjectWithTimeTable
     {
@@ -152,7 +153,7 @@ namespace SchoolyConnect
 
         public bool is_on(int day, int slot) // ofer changed to public
         {
-            foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
+            foreach (var t in Teachers) if (t.freeDay == day) return false; //if (!t.is_on(day, slot)) return false;
             if (Classes != null) foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
             if (Rooms != null) foreach (var t in Rooms) if (!t.is_on(day, slot)) return false;
 
@@ -465,33 +466,33 @@ namespace SchoolyConnect
 
                 // filterring 
                 /*************************************************/
-                // if (!name.Contains("א1")) continue;
+                //if (!name.Contains("א1")) continue;
                 if (course_type == "S") continue;
 
 
                 // in 'p' and 's' courses there are no classes hence the 
                 // filter below (the else part) would filter it. 
-                /* 
-                 * bool ok = false;
-                  if (course_type != "F") ok = true; 
-                                else
-                                    class_ids.ForEach(class_id =>
-                                {
-                                    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
-                                    if (
-                                        cl.Name.Contains("א") 
-                                    ||  cl.Name.Contains("ב")
-                                    )                   
-                                        ok = true;                                            
-                                });
+                 
+                //bool ok = false;
+                //if (course_type != "F") ok = true;
+                //else
+                //    class_ids.ForEach(class_id =>
+                //{
+                //    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                //    if (
+                //        cl.Name.Contains("א")
+                //    || cl.Name.Contains("ב")
+                //    )
+                //        ok = true;
+                //});
 
-                                if (!ok)
-                                {
-                                    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
-                                    warned_filter = true;
-                                    continue;
-                                }
-                                 */
+                //if (!ok)
+                //{
+                //    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
+                //    warned_filter = true;
+                //    continue;
+                //}
+
                 /*************************************************/
 
 

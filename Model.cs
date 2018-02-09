@@ -26,6 +26,9 @@ namespace SchoolyConnect
         public Hashtable getCourseDVars { get { return courseDVars; } }
         public Hashtable getCourseHVars { get { return courseHVars; } }
 
+        // Here we will fill courses that violate nooverlap constraints (should be hard constrained, but we make them soft).
+        public HashSet<string> uncoveredCourses = new HashSet<string>();
+
         SimpleCSP Csp;
 
         /*************************   Init ***************************/
@@ -53,14 +56,15 @@ namespace SchoolyConnect
 
                 Domain domHours = new Domain(0, maxHour); // note that we are 0-based.
 
-                for (int i = 0; i < c.Hours; ++i)
+                for (int g = 0; g < c.Hours; ++g)
                 {
-                    Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, i), domDays);
-                    Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id, i), domHours);
+                    Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, g), domDays);
+                    Variable vh = new Variable(CourseVarName(false, c.Course_Type, c.Id, g), domHours);
                     courseDVars[vd.Name] = vd;
                     courseHVars[vh.Name] = vh;
                 }
             }
+            Log("# of slots to be scheduled: " + courseDVars.Count);
         }
 
         public void PreProcess()
@@ -70,6 +74,8 @@ namespace SchoolyConnect
             {
                 tCourses.Add(new TieSchedCourse(c));
             });
+            chooseFreeDatForTeachers();
+
             InitVariables();
             Csp = new SimpleCSP();
         }
@@ -85,6 +91,44 @@ namespace SchoolyConnect
             LoadFromFile(fileName);
             PreProcess();
         }
+
+        public void chooseFreeDatForTeachers()
+        {
+            foreach (_Teacher t in teachers)
+            {                
+                for (int d = _ObjectWithTimeTable.MAX_DAY - 1; d >= 0; --d)
+                {
+                    bool freeDay = true;
+                    for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                        if (t.is_on(d, h))
+                        {
+                            freeDay = false;
+                            break;
+                        }
+                    if (freeDay)
+                    {
+                        t.freeDay = d;               
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Mark all but the first course in each cluster as type 'R'. We will later ignore these courses in the constraints. 
+        /// </summary>
+        void filterClusterCourses()
+        {
+            foreach (_Cluster cluster in clusters)
+                for (int i = 1; i < cluster.Courses.Count; ++i)
+                {
+                    TieSchedCourse c = tCourses.Find(course => course.Id == cluster.Courses[i].Id);
+                    cluster.Courses[i].Course_Type = c.Course_Type = COURSE_TYPE_ENUM.R;
+                    Debug.Assert(cluster.Courses[i].Clusters.Count == 1); // does not makes sense that a course is in more than one cluster (because then we can unite the clusters)
+                }
+        }
+
+
 
         /*************************   Utils ***************************/
 
@@ -152,18 +196,7 @@ namespace SchoolyConnect
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
                     _Course c1 = tCourses[i], c2 = tCourses[j];
-                    if (c1.Course_Type == COURSE_TYPE_ENUM.R || c2.Course_Type == COURSE_TYPE_ENUM.R) continue;
-                    bool sameCluster = false;
-                    //if the two courses share a cluster, then no nooverlap constraint. 
-                    foreach (_Cluster cl in c1.Clusters) {
-                        foreach (_Course c in cl.Courses)
-                        if (c.Id == c2.Id)
-                        {
-                            sameCluster = true;
-                            break;
-                        }                    
-                    }
-                    if (sameCluster) continue;
+                    if (c1.Course_Type == COURSE_TYPE_ENUM.R || c2.Course_Type == COURSE_TYPE_ENUM.R) continue;                   
 
                     for (int g1 = 0; g1 < c1.Hours; ++g1)
                         for (int g2 = 0; g2 < c2.Hours; ++g2)
@@ -221,7 +254,23 @@ namespace SchoolyConnect
                 for (int g = 0; g < c.Hours; ++g)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                         for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
-                            if (!c.is_on(d, h)) con_off(c, g, d, h, "off");
+                        {
+                            if (!c.is_on(d, h))
+                            {
+                                con_off(c, g, d, h, "off");
+                                continue;
+                            }
+                            // it is possible that this course represents other courses, that are not on
+                            if (c.Clusters.Count > 0)
+                            {
+                                foreach (_Course crs in c.Clusters[0].Courses)
+                                    if (!crs.is_on(d, h))
+                                    {
+                                        con_off(c, g, d, h, "off");
+                                        break;
+                                    }
+                            }
+                        }
             }
         }
 
@@ -298,34 +347,22 @@ namespace SchoolyConnect
                 }
             }
         }
-
-
-        /// <summary>
-        /// Mark all but the first course in each cluster as type 'R'. We will later ignore these courses in the constraints. 
-        /// </summary>
-        void filterClusterCourses()
-        {
-            foreach (_Cluster cluster in clusters)
-                for (int i = 1; i < cluster.Courses.Count; ++i)
-                {
-                    cluster.Courses[i].Course_Type = COURSE_TYPE_ENUM.R;
-                    Debug.Assert(cluster.Courses[i].Clusters.Count == 1); // does not makes sense that a course is in more than one cluster (because then we can unite the clusters)
-                }
-        }
-
+        
         /*************************   TieLib interface ***************************/
 
         public SimpleCSP Translate()
         {
             Log("Translating.....");
 
-            con_noOverlap();
-            con_off();
-
             // Either this:
             // con_clusters();
             // or this: 
             filterClusterCourses();
+
+            con_noOverlap();
+            con_off();
+
+            
 
             // Soft constraints:
             //con_ActiveOnDay();
@@ -339,12 +376,17 @@ namespace SchoolyConnect
             /* Courses */
             foreach (_Course c in courses)
                 for (int g = 0; g < c.Hours; ++g)
-            {
+            {                    
                     _Course course = c;
                     // completing missing assignment for type-R courses.
                     if (c.Course_Type == COURSE_TYPE_ENUM.R) course = c.Clusters[0].Courses[0]; // taking the schedule of the cluster's representative. 
-                    var d = CourseVar(true, course.Course_Type, course.Id, g);
-                    var h = CourseVar(false, course.Course_Type, course.Id, g);
+                    var d = CourseVar(true, course.Course_Type, course.Id, g);                    
+                    if (uncoveredCourses.Contains(d.Name.Substring(2)))
+                    {
+                        Log("Not reporting " + c.Name + " group " + g);
+                        continue;
+                    }
+                    var h = CourseVar(false, course.Course_Type, course.Id, g);                    
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
             }            
         }

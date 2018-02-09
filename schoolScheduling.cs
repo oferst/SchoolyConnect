@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Collections;
 using SchoolyConnect;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Windows.Forms;
+
 namespace CourseScheduling
 {
     
@@ -23,7 +28,7 @@ namespace CourseScheduling
         {
             m.ExportSolution(cspSolution);
             string receipt = m.SaveSolution(true);
-            Log("Solution sent. Receipt = " + receipt);
+            Log("Solution sent. Receipt = " + receipt);         
         }
 
         override public string name_for_benchmrks()
@@ -52,12 +57,62 @@ namespace CourseScheduling
             else
             {
                 m.fromJSONFile("");                
-            }
+            }            
 
             return m.Translate();
         }
 
-        /*************************************************************************/ 
+
+        public override string CheckSolution(SimpleCSP csp, Hashtable cspSolution)
+        {
+            //Status("Checking consistency with the hard constraints (as reflected in the current database), and making the list of broken soft constraints...");
+            string res = "";            
+            foreach (Constraint c in csp.Constraints)
+            {
+                if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
+                if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT)
+                {
+                    throw new Exception("Breaking hard constraint?? This can't be good :-(  " + c.ToString());
+                }
+                else
+                {
+                    res += (c.NegativeDisplayString == "" ? c.ToString() + "* Warning: negative string not defined for this constraint type *" : c.NegativeDisplayString) + "\r\n";
+
+                    // collect the set of the variables involved in violated constraints. 
+                    // since those constraints are nooverlap pairs, ideally we should gind a minimal
+                    // vertex cover, so as to not report a minimal #. 
+                    // The code below is a very greedy approx.: simply add the first vertex if neither vertices
+                    // was already selected. 
+                    List<Variable> l = c.getVars();
+                    SortedSet<string> keys = new SortedSet<string>();
+                    foreach (Variable v in l)
+                    {
+                        // removing the d_/h_ 
+                        string key = v.Name.Substring(2);
+                        keys.Add(key);
+                    }
+                    Debug.Assert(keys.Count == 2);
+                    // For seeing the graph: 
+                    //string dot = keys.ElementAt(0) + " -- " + keys.ElementAt(1) + ";";
+                    //Log(dot);
+
+                    bool covered = false;
+                    foreach (string k in keys)
+                        if (m.uncoveredCourses.Contains(k))
+                        {
+                            covered = true;
+                           // Log("covered " + k); // lucky, this edge is already covered. 
+                            break;
+                        }
+                    if (!covered) m.uncoveredCourses.Add(keys.First());
+                }
+            }
+            Log("# Uncovered courses: " + m.uncoveredCourses.Count);
+            return res;
+        }
+
+
+        /*************************************************************************/
 
         void ResetStaus(string solution_id = "2NkgMZLh9RyaRXbhD")
         {
