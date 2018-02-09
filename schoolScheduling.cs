@@ -27,8 +27,15 @@ namespace CourseScheduling
         override public void ExportSolution(Hashtable cspSolution)
         {
             m.ExportSolution(cspSolution);
-            string receipt = m.SaveSolution(true);
-            Log("Solution sent. Receipt = " + receipt);         
+            if (Program.flag_useJSONFileAndMonitor)
+            {
+                string receipt = m.SaveSolution(true);
+                Log("Solution sent. Receipt = " + receipt);
+            }
+            else
+            {
+                m.printSolution();
+            }
         }
 
         override public string name_for_benchmrks()
@@ -48,8 +55,8 @@ namespace CourseScheduling
                 // Loop();
       
             m = new TieSchedModel();
-            bool useJSONFileAndMonitor = true;
-            if (useJSONFileAndMonitor)
+            
+            if (Program.flag_useJSONFileAndMonitor)
             {
                 string fileName = @"../../data/in/arlozerov.json";
                 m.fromJSONFile(fileName);
@@ -105,6 +112,7 @@ namespace CourseScheduling
                             break;
                         }
                     if (!covered) m.uncoveredCourses.Add(keys.First());
+                    Log("violated: " + c.NegativeDisplayString);
                 }
             }
             Log("# Uncovered courses: " + m.uncoveredCourses.Count);

@@ -74,7 +74,7 @@ namespace SchoolyConnect
             {
                 tCourses.Add(new TieSchedCourse(c));
             });
-            chooseFreeDatForTeachers();
+            if (Program.flag_ChooseFreeDayForTeachers)  chooseFreeDatForTeachers();
 
             InitVariables();
             Csp = new SimpleCSP();
@@ -113,22 +113,7 @@ namespace SchoolyConnect
                 }
             }
         }
-
-        /// <summary>
-        /// Mark all but the first course in each cluster as type 'R'. We will later ignore these courses in the constraints. 
-        /// </summary>
-        void filterClusterCourses()
-        {
-            foreach (_Cluster cluster in clusters)
-                for (int i = 1; i < cluster.Courses.Count; ++i)
-                {
-                    TieSchedCourse c = tCourses.Find(course => course.Id == cluster.Courses[i].Id);
-                    cluster.Courses[i].Course_Type = c.Course_Type = COURSE_TYPE_ENUM.R;
-                    Debug.Assert(cluster.Courses[i].Clusters.Count == 1); // does not makes sense that a course is in more than one cluster (because then we can unite the clusters)
-                }
-        }
-
-
+        
 
         /*************************   Utils ***************************/
 
@@ -136,6 +121,19 @@ namespace SchoolyConnect
         {
             GlobalVar.Log.WriteLine(v);
         }
+
+        public void printSolution()
+        {
+            Log("**********************************************************");
+            Log("Solution:");
+            foreach (_Course c in courses)
+            {
+                foreach (SolutionLine sl in c.Solution)
+                    Log("Course:" + sl.group_id + ", day: " + sl.day + ", hour: " + sl.slot);
+            }
+            Log("**********************************************************");
+        }
+
 
         Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
         {
@@ -154,25 +152,71 @@ namespace SchoolyConnect
         {
             return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_")  + courseID + "_" + group.ToString();
         }
-        
+
+   
+      
+        /// <summary>
+        /// The representative of a cluster is the first that has the largest # of hours.
+        /// We need this property because throught representative we constrain the groups from not overlapping. 
+        /// Hence if we have two courses in the cluster with e.g., 3 and 4 groups, we need to constrain the 4 groups. 
+        /// </summary>
+        /// <param name="c"></param>
+        /// <returns></returns>
+        _Course rep(_Course c)
+        {
+            if (c.Clusters.Count == 0) return c;
+            int max = 0;
+            int res = 0;
+            for (int i = 0; i < c.Clusters[0].Courses.Count; ++i)
+                if (c.Clusters[0].Courses[i].Hours > max)
+                {
+                    res = i;
+                    max = c.Clusters[0].Courses[i].Hours;
+                }
+            return c.Clusters[0].Courses[res];
+        }
+
         /*************************   Constraints ***************************/
 
-        void con_noOverlap (int c1, int c2, int g1, int g2, string reason)
+        HashSet<Tuple<string, string, int, int>> nooverlap_constrained = new HashSet<Tuple<string, string, int, int>>();
+
+        void con_noOverlap (_Course c1, _Course c2, int g1, int g2, string reason)
         {
-            Log("nooverlap(" + tCourses[c1].Name + " group " + g1 + "," + tCourses[c2].Name + " group " + g2 + "," + reason + ")");
-            Variable vd1 = CourseVar(true, tCourses[c1].Course_Type, tCourses[c1].Id, g1);
-            Variable vd2 = CourseVar(true, tCourses[c2].Course_Type, tCourses[c2].Id, g2);
-            Variable vh1 = CourseVar(false, tCourses[c1].Course_Type, tCourses[c1].Id, g1);
-            Variable vh2 = CourseVar(false, tCourses[c2].Course_Type, tCourses[c2].Id, g2);            
+            // We constrain the representatives. 
+            _Course c1r = rep(c1), c2r = rep(c2);
+            if (c1r.Id == c2r.Id && g1 == g2) return; //If c1, c2 are from the same cluster, no need to constrain. 
+
+            // checking we did not have this constraint before. 
+            Tuple<string, string, int, int> quad;
+            if ((String.Compare(c1r.Id, c2.Id) < 0)) // convention: the pairs are alphabetically ordered, and their groups match the position. 
+                quad = new Tuple<string, string, int, int>(c1r.Id, c2r.Id, g1, g2);
+            else
+                quad = new Tuple<string, string, int, int>(c2r.Id, c1r.Id, g2, g1);
+            if (!nooverlap_constrained.Add(quad))
+            {
+                Log("removed redundant noOverlap");
+                return;
+            }
+
+            
+            Log("nooverlap(" + c1r.Name + " group " + g1 + "," + c2r.Name + " group " + g2 + "," + reason + ")");
+            Variable vd1 = CourseVar(true, c1r.Course_Type, c1r.Id, g1);
+            Variable vd2 = CourseVar(true, c2r.Course_Type, c2r.Id, g2);
+            Variable vh1 = CourseVar(false, c1r.Course_Type, c1r.Id, g1);
+            Variable vh2 = CourseVar(false, c2r.Course_Type, c2r.Id, g2);            
 
             CompositeConstraint c;
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
                                             new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
-            c.Weight = 1;
-            c.NegativeDisplayString = reason + ": no-overlap (" + tCourses[c1].Name + "," + tCourses[c2].Name+") ";
+            if (Program.flag_SoftnoOverlap) c.Weight = 1;
+            // Note we put in NegativeDisplayString the original courses c1,c2
+            c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + "," + c2.Name+") ";
             Csp.Constraints.Add(c);
         }
+
+
+      
 
         /// <summary>
         /// courses that have a shared class, shared teachers or sahred rooms cannot overlap
@@ -181,12 +225,11 @@ namespace SchoolyConnect
         {
             // groups of the same course
             for (int i = 0; i < tCourses.Count; ++i)
-            {
-                if (tCourses[i].Course_Type == COURSE_TYPE_ENUM.R) continue;
+            {        
                 for (int g1 = 0; g1 < tCourses[i].Hours - 1; ++g1)
                     for (int g2 = g1 + 1; g2 < tCourses[i].Hours; ++g2)
                     {
-                        con_noOverlap(i, i, g1, g2, "groups");
+                        con_noOverlap(tCourses[i], tCourses[i], g1, g2, "groups");
                     }
             }
 
@@ -195,8 +238,7 @@ namespace SchoolyConnect
             {
                 for (int j = i + 1; j < tCourses.Count; ++j)
                 {
-                    _Course c1 = tCourses[i], c2 = tCourses[j];
-                    if (c1.Course_Type == COURSE_TYPE_ENUM.R || c2.Course_Type == COURSE_TYPE_ENUM.R) continue;                   
+                    _Course c1 = tCourses[i], c2 = tCourses[j];                    
 
                     for (int g1 = 0; g1 < c1.Hours; ++g1)
                         for (int g2 = 0; g2 < c2.Hours; ++g2)
@@ -207,38 +249,54 @@ namespace SchoolyConnect
                                 (c1.Classes.Intersect(c2.Classes)).Any())
                             {
                                 string cl = c1.Classes.Intersect(c2.Classes).First().Name;
-                                con_noOverlap(i, j, g1, g2, "classes (e.g., " + cl+")");
+                                con_noOverlap(tCourses[i], tCourses[j], g1, g2, "classes (e.g., " + cl+")");
                                 continue;
                             }
                             /* Two courses that have shared teachers cannot overlap */
                             if ((c1.Teachers.Intersect(c2.Teachers)).Any())
                             {
                                 string t = c1.Teachers.Intersect(c2.Teachers).First().Name;
-                                con_noOverlap(i, j,g1, g2, "teachers (e.g., " + t+ ")");
+                                con_noOverlap(tCourses[i], tCourses[j], g1, g2, "teachers (e.g., " + t+ ")");
                                 continue;
                             }
                             /* Two F-type courses that have shared rooms cannot overlap */
                             if (c1.Course_Type == COURSE_TYPE_ENUM.F && tCourses[j].Course_Type == COURSE_TYPE_ENUM.F &&
                                 c1.Rooms != null && tCourses[j].Rooms != null &&
                                 (c1.Rooms.Intersect(tCourses[j].Rooms)).Any())
-                                con_noOverlap(i, j, g1, g2, "rooms");
+                                con_noOverlap(tCourses[i], tCourses[j], g1, g2, "rooms");
                         }
                 }
             }
         }
 
+        HashSet<Tuple<string, int, int, int>> off_constrained = new HashSet<Tuple<string, int, int, int>>();
+
         void con_off(_Course c1, int group, int day, int hour, string reason)
         {
-            Log("off(" + c1.Name + " group " + group + "," + day + "," + hour + "," + reason + ")");
+            _Course c1r = rep(c1);
 
-            Variable vd = CourseVar(true, c1.Course_Type, c1.Id, group);
-            Variable vh = CourseVar(false, c1.Course_Type, c1.Id, group);
+            // checking we did not have this constraint before. 
+            Tuple<string, int, int, int> quad = new Tuple<string, int, int, int>(c1r.Id,group,day,hour);
+            if (!off_constrained.Add(quad))
+            {
+                Log("Removed redundant off constraints");
+                return;
+            }
+
+            if (c1.Id != c1r.Id)
+                Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + ")");
+            else
+                Log("off(" + c1r.Name + " group " + group + "," + day + "," + hour + "," + reason + ")");
+
+            Variable vd = CourseVar(true, c1r.Course_Type, c1r.Id, group);
+            Variable vh = CourseVar(false, c1r.Course_Type, c1r.Id, group);
             CompositeConstraint c = new CompositeConstraint(BooleanOperator.OR,
                 new Constraint[]
                 {
                     new VarValConstraint(vd,day,ArithmeticalOperator.NEQ),
                     new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
                 });
+            // note that in the negativeDisplayString we put the original course c1 and not c1r
             c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + ")";
             Csp.Constraints.Add(c);
         }
@@ -249,8 +307,7 @@ namespace SchoolyConnect
         void con_off()
         {
             foreach (TieSchedCourse c in tCourses)
-            {
-                if (c.Course_Type == COURSE_TYPE_ENUM.R) continue;
+            {        
                 for (int g = 0; g < c.Hours; ++g)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                         for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
@@ -259,51 +316,11 @@ namespace SchoolyConnect
                             {
                                 con_off(c, g, d, h, "off");
                                 continue;
-                            }
-                            // it is possible that this course represents other courses, that are not on
-                            if (c.Clusters.Count > 0)
-                            {
-                                foreach (_Course crs in c.Clusters[0].Courses)
-                                    if (!crs.is_on(d, h))
-                                    {
-                                        con_off(c, g, d, h, "off");
-                                        break;
-                                    }
-                            }
+                            }                       
                         }
             }
         }
-
-        void con_Cluster(_Course c1, _Course c2, int g1, int g2, string reason)
-        {
-            Log("cluster-overlap(" + c1.Name + " group " + g1 + "," + c2.Name + " group " + g2 + "," + reason + ")");
-            Variable vd1 = CourseVar(true, c1.Course_Type, c1.Id, g1);
-            Variable vd2 = CourseVar(true, c2.Course_Type, c2.Id, g2);
-            Variable vh1 = CourseVar(false, c1.Course_Type, c1.Id, g1);
-            Variable vh2 = CourseVar(false, c2.Course_Type, c2.Id, g2);
-
-            CompositeConstraint c;
-            c = new CompositeConstraint(BooleanOperator.AND, new Constraint[]{
-                                            new VarVarConstraint(vd1, vd2, ArithmeticalOperator.EQ),
-                                            new VarVarConstraint(vh1, vh2, ArithmeticalOperator.EQ) });
-            c.NegativeDisplayString = reason + ": cluster-overlap (" + c1.Name + "," + c2.Name + ") ";
-            Csp.Constraints.Add(c);
-        }
-
-        void con_clusters()
-        {
-            foreach (_Cluster cluster in clusters) 
-                for (int i = 0; i < cluster.Courses.Count - 1; ++i)
-                    {
-                        _Course c1 = cluster.Courses[i], c2 = cluster.Courses[i+1];
-                        int min = Math.Min(c1.Hours, c2.Hours);
-                        for (int k = 0; k<min;++k)
-                        {
-                            con_Cluster(c1, c2, k, k, "cluster " + cluster.Name);
-                        }
-                    }                      
-        }
-
+             
         void con_ActiveOnDay(List<_Course> tHomeCourses, int d)
         {
             if (tHomeCourses.Count == 0) return;
@@ -353,12 +370,7 @@ namespace SchoolyConnect
         public SimpleCSP Translate()
         {
             Log("Translating.....");
-
-            // Either this:
-            // con_clusters();
-            // or this: 
-            filterClusterCourses();
-
+            
             con_noOverlap();
             con_off();
 
@@ -377,10 +389,8 @@ namespace SchoolyConnect
             foreach (_Course c in courses)
                 for (int g = 0; g < c.Hours; ++g)
             {                    
-                    _Course course = c;
-                    // completing missing assignment for type-R courses.
-                    if (c.Course_Type == COURSE_TYPE_ENUM.R) course = c.Clusters[0].Courses[0]; // taking the schedule of the cluster's representative. 
-                    var d = CourseVar(true, course.Course_Type, course.Id, g);                    
+                    _Course course = rep(c); // taking the schedule of the cluster's representative. 
+                    var d = CourseVar(true, course.Course_Type, course.Id, g);
                     if (uncoveredCourses.Contains(d.Name.Substring(2)))
                     {
                         Log("Not reporting " + c.Name + " group " + g);

@@ -10,10 +10,11 @@ namespace CourseScheduling
     /// </summary>
     internal sealed class Program
     {
-        
 
-        public const bool read_xml = false;   // reads the constraints from external xml file (filePath / "schedulinginfo.xml") instead of regenerating it from the db.
-        public const bool continue_on_errors = true;     // when inconsistencies in the database are discovered, skips the entry and logs it, rather than throwing an exception.     
+
+        static public bool flag_ChooseFreeDayForTeachers = false;
+        static public bool flag_useJSONFileAndMonitor = true;
+        static public bool flag_SoftnoOverlap = true;
 
         // note that for this to work 
         // 1) for exam scheduling the specialdays table should be correct, and the hard constraints for the exams should be updated. 

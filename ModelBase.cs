@@ -5,10 +5,11 @@ using System.IO;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Windows.Forms;
+using CourseScheduling;
 
 namespace SchoolyConnect
 {
-    enum COURSE_TYPE_ENUM { F=1,S=2,P=3, R=4}; // R = part of a cluster and being ignored for now. 
+    enum COURSE_TYPE_ENUM { F=1,S=2,P=3}; 
 
 
     class SolutionLine
@@ -153,7 +154,14 @@ namespace SchoolyConnect
 
         public bool is_on(int day, int slot) // ofer changed to public
         {
-            foreach (var t in Teachers) if (t.freeDay == day) return false; //if (!t.is_on(day, slot)) return false;
+            if (Program.flag_ChooseFreeDayForTeachers)
+            {
+                foreach (var t in Teachers) if (t.freeDay == day) return false;
+            }
+            else
+            {
+                foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
+            }
             if (Classes != null) foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
             if (Rooms != null) foreach (var t in Rooms) if (!t.is_on(day, slot)) return false;
 
@@ -252,7 +260,7 @@ namespace SchoolyConnect
             }
         }
 
-         public bool is_on(int day, int slot) 
+         public bool is_on(int day, int slot) // currently not used. 
         {            
             foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
             if (Classes != null) foreach (var t in Classes)  if (!t.is_on(day, slot)) return false;
@@ -472,7 +480,7 @@ namespace SchoolyConnect
 
                 // in 'p' and 's' courses there are no classes hence the 
                 // filter below (the else part) would filter it. 
-                 
+
                 //bool ok = false;
                 //if (course_type != "F") ok = true;
                 //else
@@ -481,7 +489,7 @@ namespace SchoolyConnect
                 //    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
                 //    if (
                 //        cl.Name.Contains("א")
-                //    || cl.Name.Contains("ב")
+                // //   || cl.Name.Contains("ב")
                 //    )
                 //        ok = true;
                 //});
@@ -585,30 +593,37 @@ namespace SchoolyConnect
                 t1.MyClass = cl1;
                 t2.MyClass = cl2;
 
+
                 // on constraints: 
-                t3.tt[1, 1] = t1.tt[1, 1] = t4.tt[1,1] = true;
-                cl2.tt[1, 1] = cl1.tt[1, 1] = true;
+                t1.tt[1, 1] = t1.tt[1, 2] = t1.tt[1, 3] = true;
+                t2.tt[1, 3] = t2.tt[1,4] = true;
 
-                t3.tt[2, 2] = t1.tt[2, 2] = true;
-                cl1.tt[2, 2] = true;
+                cl1.tt[1, 1] = cl1.tt[1, 2] = cl1.tt[1, 3] = true;
+                cl2.tt[1, 3] = cl2.tt[1, 4] = true;
 
+                _Course c1 = new _Course();
+                c1.Name = "Math";
+                c1.Id = "1";
+                c1.Hours = 1;
+                c1.Classes = new List<_Class> { cl1 };
+                c1.Teachers = new List<_Teacher> { t1 };
 
-                courses.Add(new _Course()
-                {
-                    Name = "Math",
-                    Id = "1",
-                    Hours = 5,
-                    Classes = new List<_Class> { cl1, cl2 },
-                    Teachers = new List<_Teacher> { t1, t3, t4 }
-                });
-                courses.Add(new _Course()
-                {
-                    Name = "English",
-                    Id = "2",
-                    Hours = 3,
-                    Classes = new List<_Class> { cl1 },
-                    Teachers = new List<_Teacher> { t1, t3 }
-                });
+                _Course c2 = new _Course();
+                c2.Name = "English";
+                c2.Id = "2";
+                c2.Hours = 2;
+                c2.Classes = new List<_Class> { cl2 };
+                c2.Teachers = new List<_Teacher> { t2 };
+
+                courses.Add(c1);
+                courses.Add(c2);
+
+                _Cluster cl = addCluster("id_cl1", "cluster1");
+                cl.Courses.Add(c1);
+                cl.Courses.Add(c2);
+
+                c1.Clusters.Add(cl);
+                c2.Clusters.Add(cl);
             }
         }
 
@@ -841,7 +856,7 @@ namespace SchoolyConnect
                 });
             });
 
-            string postData  = JsonConvert.SerializeObject(solution);
+            string postData = JsonConvert.SerializeObject(solution);
             return connect.Http("solution/save", postData);
         }
     }
