@@ -211,7 +211,7 @@ namespace SchoolyConnect
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
             if (Program.flag_SoftnoOverlap) c.Weight = 1;
             // Note we put in NegativeDisplayString the original courses c1,c2
-            c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + "," + c2.Name+") ";
+            c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + " group " + g1 + "," + c2.Name+ " group " + g2 + ") ";
             Csp.Constraints.Add(c);
         }
 
