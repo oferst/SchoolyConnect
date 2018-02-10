@@ -73,6 +73,7 @@ namespace CourseScheduling
         public override string CheckSolution(SimpleCSP csp, Hashtable cspSolution)
         {
             //Status("Checking consistency with the hard constraints (as reflected in the current database), and making the list of broken soft constraints...");
+            m.uncoveredCourses.Clear();
             string res = "";            
             foreach (Constraint c in csp.Constraints)
             {
@@ -111,12 +112,13 @@ namespace CourseScheduling
                            // Log("covered " + k); // lucky, this edge is already covered. 
                             break;
                         }
-                    if (!covered) m.uncoveredCourses.Add(keys.First());
                     Log("violated: " + c.NegativeDisplayString);
+                    if (!covered) m.uncoveredCourses.Add(keys.First());                    
                 }
             }
-            Log("# Uncovered courses: " + m.uncoveredCourses.Count);
-            return res;
+            Log("# Uncovered courses: " + m.uncoveredCourses.Count);            
+
+                    return res;
         }
 
 

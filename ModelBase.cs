@@ -84,8 +84,9 @@ namespace SchoolyConnect
         {
             freeDay = -1;
         }
-        public int freeDay; // ofer
+        public int freeDay; // ofer        
     }
+
     class _Class : _ObjectWithTimeTable
     {
         public _Teacher myTeacher;
@@ -298,6 +299,8 @@ namespace SchoolyConnect
         public  List<_Course> sCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.S);
         public  List<_Course> pCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.P);
 
+        public List<_Course> teacherCourses(_Teacher t)  => courses.FindAll(course => course.Teachers.Contains(t));
+
         private Connect connect;
         
         protected ModelBase()
@@ -475,31 +478,31 @@ namespace SchoolyConnect
                 // filterring 
                 /*************************************************/
                 //if (!name.Contains("א1")) continue;
-                if (course_type == "S") continue;
+                if (course_type == "P") continue;
 
 
                 // in 'p' and 's' courses there are no classes hence the 
                 // filter below (the else part) would filter it. 
 
-                //bool ok = false;
-                //if (course_type != "F") ok = true;
-                //else
-                //    class_ids.ForEach(class_id =>
-                //{
-                //    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
-                //    if (
-                //        cl.Name.Contains("א")
-                // //   || cl.Name.Contains("ב")
-                //    )
-                //        ok = true;
-                //});
+                bool ok = false;
+                if (course_type != "F") ok = true;
+                else
+                    class_ids.ForEach(class_id =>
+                {
+                    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                    if (
+                        cl.Name.Contains("ד")
+                    //   || cl.Name.Contains("ב")
+                    )
+                        ok = true;
+                });
 
-                //if (!ok)
-                //{
-                //    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
-                //    warned_filter = true;
-                //    continue;
-                //}
+                if (!ok)
+                {
+                    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
+                    warned_filter = true;
+                    continue;
+                }
 
                 /*************************************************/
 
