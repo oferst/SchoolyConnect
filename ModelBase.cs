@@ -84,8 +84,9 @@ namespace SchoolyConnect
         {
             freeDay = -1;
         }
-        public int freeDay; // ofer
+        public int freeDay; // ofer        
     }
+
     class _Class : _ObjectWithTimeTable
     {
         public _Teacher myTeacher;
@@ -152,8 +153,9 @@ namespace SchoolyConnect
             Solution.Add(new SolutionLine(Id,Day,Slot));
         }
 
-        public bool is_on(int day, int slot) // ofer changed to public
+        public bool is_on(int day, int slot, ref bool soft) // ofer changed to public
         {
+            soft = false;
             if (Program.flag_ChooseFreeDayForTeachers)
             {
                 foreach (var t in Teachers) if (t.freeDay == day) return false;
@@ -162,8 +164,25 @@ namespace SchoolyConnect
             {
                 foreach (var t in Teachers) if (!t.is_on(day, slot)) return false;
             }
-            if (Classes != null) foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
             if (Rooms != null) foreach (var t in Rooms) if (!t.is_on(day, slot)) return false;
+
+            if (Classes != null)
+            {
+                //if (!t.is_on(day, slot))  // original
+
+                // !! experiment 1, freeing one hour if it is <= 6
+                foreach (var t in Classes)                
+                    if ((!t.is_on(day, slot) && slot >= 7) ||
+                        (!t.is_on(day, slot) && !t.is_on(day, slot - 1))
+                        )
+                        return false;
+                    else 
+                    if (!t.is_on(day, slot)) // the case that we permitted because of the experiment.
+                    {
+                        soft = true;                        
+                    }
+            }
+            
 
             return true;            
         }
@@ -297,6 +316,8 @@ namespace SchoolyConnect
         public  List<_Course> fCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.F);
         public  List<_Course> sCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.S);
         public  List<_Course> pCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.P);
+
+        public List<_Course> teacherCourses(_Teacher t)  => courses.FindAll(course => course.Teachers.Contains(t));
 
         private Connect connect;
         
@@ -475,7 +496,7 @@ namespace SchoolyConnect
                 // filterring 
                 /*************************************************/
                 //if (!name.Contains("א1")) continue;
-                if (course_type == "S") continue;
+                if (course_type == "P") continue;
 
 
                 // in 'p' and 's' courses there are no classes hence the 
@@ -488,8 +509,8 @@ namespace SchoolyConnect
                 //{
                 //    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
                 //    if (
-                //        cl.Name.Contains("א")
-                // //   || cl.Name.Contains("ב")
+                //        cl.Name.Contains("ד")
+                //       || cl.Name.Contains("ג")
                 //    )
                 //        ok = true;
                 //});
