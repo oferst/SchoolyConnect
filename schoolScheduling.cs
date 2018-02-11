@@ -91,6 +91,9 @@ namespace CourseScheduling
                     // vertex cover, so as to not report a minimal #. 
                     // The code below is a very greedy approx.: simply add the first vertex if neither vertices
                     // was already selected. 
+                    if (!(c.NegativeDisplayString.Contains("no-overlap"))) continue; // we identify those skipped constraints in a crude way. 
+                                                            // hopefully there won't be other VarVarConstraint soft constraints. 
+
                     List<Variable> l = c.getVars();
                     SortedSet<string> keys = new SortedSet<string>();
                     foreach (Variable v in l)

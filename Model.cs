@@ -41,6 +41,7 @@ namespace SchoolyConnect
 
             courseDVars.Clear();
             courseHVars.Clear();
+            bool soft = false;
 
             foreach (_Course c in tCourses)
             {
@@ -49,7 +50,7 @@ namespace SchoolyConnect
                 for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                 {
                     for (int h = _ObjectWithTimeTable.MAX_HOUR - 1; h >= 0; --h)
-                        if (c.is_on(d, h))
+                        if (c.is_on(d, h, ref soft))
                         {
                             maxHour = Math.Max(maxHour, h);
                             break;
@@ -214,9 +215,11 @@ namespace SchoolyConnect
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
                                             new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
-            if (Program.flag_SoftnoOverlap) c.Weight = 1;
+            if (Program.flag_SoftnoOverlap) c.Weight = 2;
+
             // Note we put in NegativeDisplayString the original courses c1,c2
-            c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + "," + c2.Name + ") ";
+            // also note that we search for the term 'no-overlap' in 'CheckSolution' so do not change it. 
+            c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + " group " + g1 + "," + c2.Name+ " group " + g2 + ") ";
             Csp.Constraints.Add(c);
         }
 
@@ -276,7 +279,7 @@ namespace SchoolyConnect
 
         HashSet<Tuple<string, int, int, int>> off_constrained = new HashSet<Tuple<string, int, int, int>>();
 
-        void con_off(_Course c1, int group, int day, int hour, string reason)
+        void con_off(_Course c1, int group, int day, int hour, string reason, bool soft = false)
         {
             _Course c1r = rep(c1);
 
@@ -302,7 +305,8 @@ namespace SchoolyConnect
                     new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
                 });
             // note that in the negativeDisplayString we put the original course c1 and not c1r
-            c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + ")";
+            if (soft) c.Weight = 1;
+            c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + " weight = " + c.Weight + ")";
             Csp.Constraints.Add(c);
         }
 
@@ -317,11 +321,14 @@ namespace SchoolyConnect
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                         for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                         {
-                            if (!c.is_on(d, h))
+                            bool soft = false;
+                            if (!c.is_on(d, h, ref soft))
                             {
-                                con_off(c, g, d, h, "off");
+                                con_off(c, g, d, h, "off");                                
                                 continue;
                             }
+                            if (soft)
+                                con_off(c, g, d, h, "off", true);
                         }
             }
         }
