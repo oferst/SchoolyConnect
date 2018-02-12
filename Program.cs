@@ -1,4 +1,5 @@
 ﻿
+using SchoolyConnect;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
@@ -11,10 +12,12 @@ namespace CourseScheduling
     internal sealed class Program
     {
 
+        public enum mode { JSONFile, Local, ServerLoop}
+        static public mode flag_mode = mode.ServerLoop;
 
-        static public bool flag_ChooseFreeDayForTeachers = false;
-        static public bool flag_useJSONFileAndMonitor = true;
-        static public bool flag_SoftnoOverlap = true;
+        static public bool flag_ChooseFreeDayForTeachers = false;        
+        static public bool flag_SoftnoOverlap = false; //true;
+        static public bool flag_filter = true;
 
         // note that for this to work 
         // 1) for exam scheduling the specialdays table should be correct, and the hard constraints for the exams should be updated. 
@@ -30,7 +33,41 @@ namespace CourseScheduling
         {
             GlobalVar.Init(); // initializes the log file. 
 
-            if (make_benchmarks)
+            if (flag_mode == mode.ServerLoop)
+            {
+                Connect con = new Connect();
+                /******************* Check for pending requests *******************/
+                con.PollRequests();
+                
+                con.requests.ForEach(request =>
+                {
+                    if (request.status == "submit")
+                    {
+                        schoolScheduling sched = new schoolScheduling();
+                        sched.m = new TieSchedModel();
+                        sched.Log("-----------------------------");
+                        sched.Log("Pending Requests:");
+                        sched.Log(request.AsString());
+                        string jsonString = con.GetRequestData(request.solution_id);
+                        sched.m.fromJSONString(jsonString);
+
+                        /* notify server, solution in progress */
+                        con.SetStatus(request.solution_id, "solver");
+
+                        sched.Log("Solving....");
+
+                        MainForm m = null;
+                        m = new MainForm(sched);
+                        m.ShowDialog();                        
+                    }
+                });
+                MessageBox.Show("Ended request Loop");
+                return;
+            }
+
+
+
+                    if (make_benchmarks)
             {
                 MainForm m;
                 int[] numSemesters = new int[] { 1, 3, 5, 0 }; // 0 = no limit
@@ -44,6 +81,10 @@ namespace CourseScheduling
                 MessageBox.Show("Finished generating benchmarks");
                 return;
             }
+
+
+            
+
 
             string title = " "; 
             List<string> schedulers = new List<string> {"לוח שעות"};

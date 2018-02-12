@@ -18,7 +18,7 @@ namespace SchoolyConnect
         }
     }
 
-    class TieSchedModel : ModelBase
+    public class TieSchedModel : ModelBase
     {
         List<TieSchedCourse> tCourses;
         Hashtable courseDVars = new Hashtable();
@@ -58,7 +58,7 @@ namespace SchoolyConnect
                 }
 
                 Domain domHours = new Domain(0, maxHour); // note that we are 0-based.
-
+                Log(c.Name + " " + maxHour);
                 for (int g = 0; g < c.Hours; ++g)
                 {
                     Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, g), domDays);
@@ -436,6 +436,7 @@ namespace SchoolyConnect
                 if (c.Course_Type != COURSE_TYPE_ENUM.F) continue;
                 if (c.Hours <= 1) continue;
                 if (c.Max_Daily_Hours >= c.Hours) continue;
+                if (c.Max_Daily_Hours != 1) continue; // !!
                 List<_Teacher> classHomeTeachers = new List<_Teacher>();
                 foreach (_Class cl in c.Classes) classHomeTeachers.Add(cl.myTeacher);
                 if (c.Teachers.Intersect(classHomeTeachers).Any()) continue; // if a homeTeacher of one of c's classes teaches this course, then we do not apply restrictions.
@@ -450,7 +451,7 @@ namespace SchoolyConnect
 
         public SimpleCSP Translate()
         {
-            buildGraph();
+            //buildGraph();
             Log("Translating.....");
             con_maxHours();
             con_noOverlap();

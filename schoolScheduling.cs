@@ -13,7 +13,7 @@ namespace CourseScheduling
     public class schoolScheduling : Scheduling
     {
 
-        TieSchedModel m;
+        public TieSchedModel m;
         
         /*********************  TieLib interface ***********************/
 
@@ -27,7 +27,7 @@ namespace CourseScheduling
         override public void ExportSolution(Hashtable cspSolution)
         {
             m.ExportSolution(cspSolution);
-            if (Program.flag_useJSONFileAndMonitor)
+            if (Program.flag_mode == Program.mode.JSONFile)
             {
                 string receipt = m.SaveSolution(true);
                 Log("Solution sent. Receipt = " + receipt);
@@ -56,7 +56,7 @@ namespace CourseScheduling
       
             m = new TieSchedModel();
             
-            if (Program.flag_useJSONFileAndMonitor)
+            if (Program.flag_mode == Program.mode.JSONFile)
             {
                 string fileName = @"../../data/in/arlozerov.json";
                 m.fromJSONFile(fileName);

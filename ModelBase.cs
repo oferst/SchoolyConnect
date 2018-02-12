@@ -9,10 +9,10 @@ using CourseScheduling;
 
 namespace SchoolyConnect
 {
-    enum COURSE_TYPE_ENUM { F=1,S=2,P=3}; 
+    public enum COURSE_TYPE_ENUM { F=1,S=2,P=3};
 
 
-    class SolutionLine
+    public class SolutionLine
     {
         public string group_id { get; set; }
         public int day { get; set; }
@@ -27,7 +27,7 @@ namespace SchoolyConnect
     }
 
 
-    class _Object
+    public class _Object
     {
         
         private string id = "";
@@ -41,10 +41,10 @@ namespace SchoolyConnect
             
         }
     }
-    class _ObjectWithTimeTable : _Object
+    public class _ObjectWithTimeTable : _Object
     {
         public const int MAX_DAY = 6;
-        public const int MAX_HOUR = 8;
+        public const int MAX_HOUR = 10;
         public int ttTotal => tt.Cast<bool>().Sum(b => { return b ? 1 : 0; });
         protected _ObjectWithTimeTable () : base()
         {
@@ -60,7 +60,7 @@ namespace SchoolyConnect
 
 
     }
-    class _Subject: _Object
+    public class _Subject: _Object
     {
         public _Subject() : base()
         {
@@ -68,7 +68,7 @@ namespace SchoolyConnect
         }
 
     }
-    class _Room : _ObjectWithTimeTable
+    public class _Room : _ObjectWithTimeTable
     {
         public _Room() : base()
         {
@@ -76,7 +76,7 @@ namespace SchoolyConnect
         }
 
     }
-    class _Teacher : _ObjectWithTimeTable
+    public class _Teacher : _ObjectWithTimeTable
     {
         private _Class myClass;
         public _Class MyClass { get => myClass; set => myClass = value; }
@@ -87,7 +87,7 @@ namespace SchoolyConnect
         public int freeDay; // ofer        
     }
 
-    class _Class : _ObjectWithTimeTable
+    public class _Class : _ObjectWithTimeTable
     {
         public _Teacher myTeacher;
 
@@ -97,7 +97,7 @@ namespace SchoolyConnect
         }
     }
 
-    class _Course : _Object
+    public class _Course : _Object
     {
         public int  Hours { get; set; }
         public int  cHours { get
@@ -113,7 +113,7 @@ namespace SchoolyConnect
             }
         }
 
-        public  COURSE_TYPE_ENUM  Course_Type { get; set; }
+        public COURSE_TYPE_ENUM  Course_Type { get; set; }
         public _Subject Subject { get; set; }
         public int  Max_Daily_Hours { get; set; }
         public List<_Teacher> Teachers { get; set; }
@@ -168,19 +168,24 @@ namespace SchoolyConnect
 
             if (Classes != null)
             {
+                if (slot > 7 && Course_Type != COURSE_TYPE_ENUM.S) return false;
+                if (slot > 8 && Course_Type == COURSE_TYPE_ENUM.S) return false;
+                // last hours are soft-constrained
+                if (slot == 7 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
+                if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;
                 //if (!t.is_on(day, slot))  // original
 
                 // !! experiment 1, freeing one hour if it is <= 6
-                foreach (var t in Classes)                
-                    if ((!t.is_on(day, slot) && slot >= 7) ||
-                        (!t.is_on(day, slot) && !t.is_on(day, slot - 1))
-                        )
-                        return false;
-                    else 
-                    if (!t.is_on(day, slot)) // the case that we permitted because of the experiment.
-                    {
-                        soft = true;                        
-                    }
+                //foreach (var t in Classes)                
+                //    if ((!t.is_on(day, slot) && slot >= 7) ||
+                //        (!t.is_on(day, slot) && !t.is_on(day, slot - 1))
+                //        )
+                //        return false;
+                //    else 
+                //    if (!t.is_on(day, slot)) // the case that we permitted because of the experiment.
+                //    {
+                //        soft = true;                        
+                //    }
             }
             
 
@@ -190,7 +195,7 @@ namespace SchoolyConnect
 
 
 
-    class _Cluster : _Object
+    public class _Cluster : _Object
     {
         /******* From Solver ************/
         public int ttDay { get; set; }
@@ -297,7 +302,7 @@ namespace SchoolyConnect
     }
 
     
-    class ModelBase
+    public class ModelBase
     {
         public string SchoolName { get; set; }
         public string InstiCode { get; set; }
@@ -501,32 +506,42 @@ namespace SchoolyConnect
 
                 // in 'p' and 's' courses there are no classes hence the 
                 // filter below (the else part) would filter it. 
+                if (Program.flag_filter)
+                {
+                    bool ok = false;
+                    if (course_type != "F") ok = true;
+                    else
+                        class_ids.ForEach(class_id =>
+                    {
+                        _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                        if (
+                                false
+                             || cl.Name.Contains("א")
+                             || cl.Name.Contains("ב")
+                             || cl.Name.Contains("ג")
+                             || cl.Name.Contains("ד")
+                             || cl.Name.Contains("ה")
+                             || cl.Name.Contains("ו1")
+                             || cl.Name.Contains("ו2")
+                             || cl.Name.Contains("ו3")
+                             || cl.Name.Contains("ו4")
+                             || cl.Name.Contains("ו5")
+                        )
+                            ok = true;
+                    });
 
-                //bool ok = false;
-                //if (course_type != "F") ok = true;
-                //else
-                //    class_ids.ForEach(class_id =>
-                //{
-                //    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
-                //    if (
-                //        cl.Name.Contains("ד")
-                //       || cl.Name.Contains("ג")
-                //    )
-                //        ok = true;
-                //});
-
-                //if (!ok)
-                //{
-                //    if (!warned_filter) MessageBox.Show("Warning: population is filterred");
-                //    warned_filter = true;
-                //    continue;
-                //}
-
-                /*************************************************/
+                    if (!ok)
+                    {
+                         //if (!warned_filter) MessageBox.Show("Warning: population is filterred");
+                        warned_filter = true;
+                        continue;
+                    }
+                }
+                    /*************************************************/
 
 
 
-                _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
+                    _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
 
                 c.Subject = subjects.Find(x => x.Id == subject.ToString());
                                         
