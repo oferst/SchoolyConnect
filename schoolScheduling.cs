@@ -27,8 +27,9 @@ namespace CourseScheduling
         override public void ExportSolution(Hashtable cspSolution)
         {
             m.ExportSolution(cspSolution);
-            if (Program.flag_mode == Program.mode.JSONFile)
+            if (Program.flag_mode == Program.mode.JSONFile || Program.flag_mode == Program.mode.ServerLoop)
             {
+                m.printSolution();
                 string receipt = m.SaveSolution(true);
                 Log("Solution sent. Receipt = " + receipt);
             }
@@ -47,25 +48,7 @@ namespace CourseScheduling
 
 
         override public SimpleCSP TranslateToCSP() // main function for adding constraints **
-        {
-            /*  revert our sample data solution back to submit status */
-              //ResetStaus(); 
-            
-            /* Workflow for sequential proccessing */
-                // Loop();
-      
-            m = new TieSchedModel();
-            
-            if (Program.flag_mode == Program.mode.JSONFile)
-            {
-                string fileName = @"../../data/in/arlozerov.json";
-                m.fromJSONFile(fileName);
-            }
-            else
-            {
-                m.fromJSONFile("");                
-            }            
-
+        {        
             return m.Translate();
         }
 
@@ -73,6 +56,7 @@ namespace CourseScheduling
         public override string CheckSolution(SimpleCSP csp, Hashtable cspSolution)
         {
             //Status("Checking consistency with the hard constraints (as reflected in the current database), and making the list of broken soft constraints...");
+            Dictionary<string, Tuple<Variable, Variable>> tryFix = new Dictionary<string, Tuple<Variable, Variable>>();
             m.uncoveredCourses.Clear();
             string res = "";            
             foreach (Constraint c in csp.Constraints)
@@ -91,7 +75,7 @@ namespace CourseScheduling
                     // vertex cover, so as to not report a minimal #. 
                     // The code below is a very greedy approx.: simply add the first vertex if neither vertices
                     // was already selected. 
-                    if (!(c.NegativeDisplayString.Contains("no-overlap"))) continue; // we identify those skipped constraints in a crude way. 
+                    if (!Program.flag_SoftnoOverlap || !(c.NegativeDisplayString.Contains("no-overlap"))) continue; // we identify those skipped constraints in a crude way. 
                                                             // hopefully there won't be other VarVarConstraint soft constraints. 
 
                     List<Variable> l = c.getVars();
@@ -102,90 +86,82 @@ namespace CourseScheduling
                         string key = v.Name.Substring(2);
                         keys.Add(key);
                     }
-                    Debug.Assert(keys.Count == 2);
-                    // For seeing the graph: 
-                    //string dot = keys.ElementAt(0) + " -- " + keys.ElementAt(1) + ";";
-                    //Log(dot);
-
+                    Debug.Assert(keys.Count == 2); // because we are supposed to get here only on overlaps which we turned into soft.
+                    
                     bool covered = false;
                     foreach (string k in keys)
                         if (m.uncoveredCourses.Contains(k))
                         {
-                            covered = true;
-                           // Log("covered " + k); // lucky, this edge is already covered. 
+                            covered = true;  // lucky, this edge is already covered.                            
                             break;
                         }
                     Log("violated: " + c.NegativeDisplayString);
-                    if (!covered) m.uncoveredCourses.Add(keys.First());                    
+                    if (!covered)
+                    {
+                        m.uncoveredCourses.Add(keys.First());
+                        // heck. Assumse that the d/h pair we need for later is either at locations 0,1, or 2,3
+                        if (l[0].Name.Contains(keys.First())) tryFix[keys.First()] = new Tuple<Variable, Variable>(l[0],l[1]);
+                        else tryFix[keys.First()] = new Tuple<Variable, Variable>(l[2], l[3]);
+                    }
                 }
             }
-            Log("# Uncovered courses: " + m.uncoveredCourses.Count);            
+            Log("# Uncovered courses: " + m.uncoveredCourses.Count);
 
-                    return res;
+            // fixSolution(csp, cspSolution, tryFix); needs to be fixed.
+
+            return res;
         }
 
 
-        /*************************************************************************/
-
-        void ResetStaus(string solution_id = "2NkgMZLh9RyaRXbhD")
+        void fixSolution(SimpleCSP csp, Hashtable cspSolution, Dictionary<string, Tuple<Variable, Variable>> tryFix)
         {
-            Connect con = new Connect();
-            con.SetStatus(solution_id, "submit");
-        }
-
-        void Loop()
-        {
-            Connect con = new Connect();
-            m = new TieSchedModel();
-
-            /******************* Check for pending requests *******************/
-            con.PollRequests();
-            Log("-----------------------------");
-            Log("Pending Requests:");
-            con.requests.ForEach(request =>
+            
+            HashSet<string> solved = new HashSet<string>();
+            foreach (string course in m.uncoveredCourses)
             {
-                if (request.status == "submit")
-                {
-                    Console.WriteLine(request.AsString());
-                    string jsonString = con.GetRequestData(request.solution_id);
-                    m.fromJSONString(jsonString);
-
-                    /* notify server, solution in progress */
-                    con.SetStatus(request.solution_id, "solver");
-
-                    Log("Solving....");
-
-
-                    /* solve! */
-
-
-                    /* populate solution */
-                    m.courses.ForEach(course =>
-                    {
-                        // SolutionCourse c = solution.courses.Find(x=>x.Id==course.Id);
-                        // course.ttDay  = SolutionCourse.day;
-                        // course.ttHour = SolutionCourse.hour;
-                    });
-                    m.clusters.ForEach(cluster =>
-                    {
-                        // SolutionCluster c = Solution.clusters.Find(x=>x.Id==cluster.Id);
-                        cluster.Courses.ForEach(course =>
+                Variable vd = tryFix[course].Item1, vh = tryFix[course].Item2;
+                int best_day = -1, best_hour = -1, fine = 100;
+                for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                    for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                    {                                                
+                        if (vd.Domain.Last < h) continue;
+                        cspSolution[vd] = d;                        
+                        cspSolution[vh] = h;
+                        bool fail = false;
+                        int slot_fine = 0;
+                        foreach (Constraint c in csp.Constraints)
                         {
-                            // course.ttDay  = SolutionCourse.day;
-                            // course.ttHour = SolutionCourse.hour;
-                        });
-                    });
+                            if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
+                            if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT)
+                            {
+                                fail = true;
+                                break;
+                            }
+                            slot_fine += c.Weight;                                                            
+                        }
+                        if (!fail && (slot_fine < fine))
+                        {
+                            fine = slot_fine;
+                            best_day = d;
+                            best_hour = h;
+                        }
+                    }
 
-                    /*  send solution to Host  */
-                    bool isFinal = true;
-                    string receipt = m.SaveSolution(isFinal);
-
-                    Log("Solution sent:" + receipt);
+                if (best_day >=0) // found a slot for course
+                {
+                    solved.Add(course);
+                    Log("Solved " + course + ":" + best_day + "," + best_hour);                    
+                    
+                    cspSolution[vd] = best_day;
+                    cspSolution[vh] = best_hour;
                 }
-            });
-            Log("-----------------------------");
-            /************************************************************/
+            }
+            m.uncoveredCourses = new HashSet<string>(m.uncoveredCourses.Except(solved));
+            Log("After fixing, # of uncovered courses: " + m.uncoveredCourses.Count);
+
         }
 
+
+        
     }
 }

@@ -134,7 +134,7 @@ namespace SchoolyConnect
             foreach (_Course c in courses)
             {
                 foreach (SolutionLine sl in c.Solution)
-                    Log("Course:" + sl.group_id + ", day: " + sl.day + ", hour: " + sl.slot);
+                    Log("Course:" + getCourse(sl.group_id).Name + ", day: " + sl.day + ", hour: " + sl.slot);
             }
             Log("**********************************************************");
         }
@@ -215,7 +215,7 @@ namespace SchoolyConnect
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
                                             new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
-            if (Program.flag_SoftnoOverlap) c.Weight = 2;
+            if (Program.flag_SoftnoOverlap) c.Weight = 3;
 
             // Note we put in NegativeDisplayString the original courses c1,c2
             // also note that we search for the term 'no-overlap' in 'CheckSolution' so do not change it. 
@@ -291,11 +291,6 @@ namespace SchoolyConnect
                 return;
             }
 
-            if (c1.Id != c1r.Id)
-                Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + ")");
-            else
-                Log("off(" + c1r.Name + " group " + group + "," + day + "," + hour + "," + reason + ")");
-
             Variable vd = CourseVar(true, c1r.Course_Type, c1r.Id, group);
             Variable vh = CourseVar(false, c1r.Course_Type, c1r.Id, group);
             CompositeConstraint c = new CompositeConstraint(BooleanOperator.OR,
@@ -305,7 +300,12 @@ namespace SchoolyConnect
                     new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
                 });
             // note that in the negativeDisplayString we put the original course c1 and not c1r
-            if (soft) c.Weight = 1;
+            if (soft && hour == 7) c.Weight = 1; // TODO: move to config. constants
+            if (soft && hour == 8) c.Weight = 2;
+            if (c1.Id != c1r.Id)
+                Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
+            else
+                Log("off(" + c1r.Name + " group " + group + "," + day + "," + hour + "," + reason + "weight " +  c.Weight + ")");
             c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + " weight = " + c.Weight + ")";
             Csp.Constraints.Add(c);
         }
@@ -436,7 +436,7 @@ namespace SchoolyConnect
                 if (c.Course_Type != COURSE_TYPE_ENUM.F) continue;
                 if (c.Hours <= 1) continue;
                 if (c.Max_Daily_Hours >= c.Hours) continue;
-                if (c.Max_Daily_Hours != 1) continue; // !!
+                //if (c.Max_Daily_Hours != 1) continue; // !!
                 List<_Teacher> classHomeTeachers = new List<_Teacher>();
                 foreach (_Class cl in c.Classes) classHomeTeachers.Add(cl.myTeacher);
                 if (c.Teachers.Intersect(classHomeTeachers).Any()) continue; // if a homeTeacher of one of c's classes teaches this course, then we do not apply restrictions.
@@ -469,6 +469,7 @@ namespace SchoolyConnect
         public void ExportSolution(Hashtable cspSolution)
         {
             /* Courses */
+            int counter = 0;
             foreach (_Course c in courses)
                 for (int g = 0; g < c.Hours; ++g)
                 {
@@ -481,35 +482,56 @@ namespace SchoolyConnect
                     }
                     var h = CourseVar(false, course.Course_Type, course.Id, g);
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
+                    counter++;
+                    Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
                 }
+            Log("exported " + counter + " lines");
         }
 
         /************************  Graphs ************************/
 
         void buildGraph()
         {
+            
+            Dictionary<Tuple<string, string>, int> common_teachers = new Dictionary<Tuple<string, string>, int>();
+            Dictionary<Tuple<string, string>, int> common_classes = new Dictionary<Tuple<string, string>, int>();
+            Dictionary<Tuple<string, string>, int> common_rooms = new Dictionary<Tuple<string, string>, int>();
+
+            // common teachers of classes (F classes). 
+            for (int i = 0; i < classes.Count; ++i)
+                for (int j = i + 1; j < classes.Count; ++j)
+                {
+                    char c1 = classes[i].Name[0], c2 = classes[j].Name[0];
+                    if (c1 == c2) continue;
+                    c1 = (char)((int)c1 + 'A' - 'א');
+                    c2 = (char)((int)c2 + 'A' - 'א');
+                    string layer1 = c1.ToString(), layer2 = c2.ToString();
+
+                    List<_Course> 
+                        cl1Courses = classCourses(classes[i]), 
+                        cl2Courses = classCourses(classes[j]);
+                    // The list of teachers of these classes: 
+                    HashSet<_Teacher> cl1Teachers = new HashSet<_Teacher>(), cl2Teachers = new HashSet<_Teacher>();
+                    foreach (_Course c in cl1Courses)
+                        foreach (_Teacher t in c.Teachers) cl1Teachers.Add(t); 
+                    foreach (_Course c in cl2Courses)
+                        foreach (_Teacher t in c.Teachers) cl2Teachers.Add(t);
+                    int num = cl1Teachers.Intersect(cl2Teachers).Count();
+                    if (num > 0)
+                    {   
+                        Tuple<string, string> edge = new Tuple<string, string>(layer1, layer2);
+                        if (common_teachers.Keys.Contains(edge)) 
+                            common_teachers[edge] += num;
+                        else common_teachers[edge] = num;
+                    }
+                }
+
             using (StreamWriter file = new StreamWriter(@"C:\temp\school.dot"))
             {
                 
                 file.WriteLine("graph school {");
-                for (int i = 0; i < courses.Count; ++i)
-                    for (int j = i + 1; j < courses.Count; ++j)
-                    {
-                        _Course c1 = rep(courses[i]), c2 = rep(courses[j]);
-                        if (c1.Id != courses[i].Id || c2.Id != courses[j].Id) continue;
-                        int t = 0, c = 0, r = 0;
-                        foreach (_Class cl1 in c1.Classes)
-                            foreach (_Class cl2 in c2.Classes)
-                            {
-                                string st1 = cl1.Name, st2 = cl2.Name;
-                                if (c1.Teachers.Intersect(c2.Teachers).Any()) t++;
-                                if (c1.Classes.Intersect(c2.Classes).Any()) c++;
-                                if (c1.Rooms.Intersect(c2.Rooms).Any()) r++;
-
-                                if (t + c + r > 0) file.WriteLine(st1 + " -- " + st2 + "[" + t.ToString() + "," + c.ToString() + "," + r.ToString() + "]");
-                            }
-
-                    }
+                foreach (Tuple<string, string> edge in common_teachers.Keys)
+                    file.WriteLine(edge.Item1 + " -- " + edge.Item2 + " [label = \"" + common_teachers[edge] + "\"]");
                 file.WriteLine("}");
             }
         }

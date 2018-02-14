@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Windows.Forms;
 using CourseScheduling;
+using System.Diagnostics;
 
 namespace SchoolyConnect
 {
@@ -153,7 +154,7 @@ namespace SchoolyConnect
             Solution.Add(new SolutionLine(Id,Day,Slot));
         }
 
-        public bool is_on(int day, int slot, ref bool soft) // ofer changed to public
+        public bool is_on(int day, int slot, ref bool soft) 
         {
             soft = false;
             if (Program.flag_ChooseFreeDayForTeachers)
@@ -168,10 +169,10 @@ namespace SchoolyConnect
 
             if (Classes != null)
             {
-                if (slot > 7 && Course_Type != COURSE_TYPE_ENUM.S) return false;
+                if (slot > 8 && Course_Type != COURSE_TYPE_ENUM.S) return false;
                 if (slot > 8 && Course_Type == COURSE_TYPE_ENUM.S) return false;
                 // last hours are soft-constrained
-                if (slot == 7 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
+                if ((slot == 8 || slot == 7) && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
                 if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;
                 //if (!t.is_on(day, slot))  // original
 
@@ -323,6 +324,7 @@ namespace SchoolyConnect
         public  List<_Course> pCourses => courses.FindAll(course => course.Course_Type == COURSE_TYPE_ENUM.P);
 
         public List<_Course> teacherCourses(_Teacher t)  => courses.FindAll(course => course.Teachers.Contains(t));
+        public List<_Course> classCourses(_Class cl) => courses.FindAll(course => course.Classes.Contains(cl));
 
         private Connect connect;
         
@@ -338,7 +340,7 @@ namespace SchoolyConnect
         
         }
 
-        _Course getCourse(string id)
+        public _Course getCourse(string id)
         {
             return courses.Find(x=> x.Id == id.ToString());
         }
@@ -394,6 +396,7 @@ namespace SchoolyConnect
 
         _Course addCourse(string id, string name, string course_type, int hours, int max_daily_hours)
         {
+            if (course_type == "?") course_type = "P";
             _Course c = new _Course() {
                 Id = id,
                 Name = name,
@@ -501,8 +504,12 @@ namespace SchoolyConnect
                 // filterring 
                 /*************************************************/
                 //if (!name.Contains("א1")) continue;
-                if (course_type == "P") continue;
-
+                if (course_type == "P" || course_type == "?") continue; // ? = temporary
+                if (name.Contains("צוות"))
+                {
+                    GlobalVar.Log.WriteLine("skipping " + name);
+                    continue;
+                }
 
                 // in 'p' and 's' courses there are no classes hence the 
                 // filter below (the else part) would filter it. 
@@ -521,11 +528,11 @@ namespace SchoolyConnect
                              || cl.Name.Contains("ג")
                              || cl.Name.Contains("ד")
                              || cl.Name.Contains("ה")
-                             || cl.Name.Contains("ו1")
-                             || cl.Name.Contains("ו2")
-                             || cl.Name.Contains("ו3")
-                             || cl.Name.Contains("ו4")
-                             || cl.Name.Contains("ו5")
+                             || cl.Name.Contains("ו")
+                        //|| cl.Name.Contains("ו2")
+                        //|| cl.Name.Contains("ו3")
+                        //|| cl.Name.Contains("ו4")
+                        //|| cl.Name.Contains("ו5")
                         )
                             ok = true;
                     });
@@ -537,16 +544,21 @@ namespace SchoolyConnect
                         continue;
                     }
                 }
-                    /*************************************************/
 
+                List<JToken> teacher_ids = jCourse["teachers"].ToList();
 
+                if (class_ids.Count == 0 && teacher_ids.Count <= 1) continue; // extension of "P"
 
-                    _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
+                /*************************************************/
+
+                _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
 
                 c.Subject = subjects.Find(x => x.Id == subject.ToString());
                                         
-                List<JToken> teacher_ids = jCourse["teachers"].ToList();
+                
                 List<JToken> room_ids = jCourse["rooms"].ToList();
+
+                Debug.Assert(course_type == "F" || teacher_ids.Count <= 1 || class_ids.Count == 0);
 
                 class_ids.ForEach(class_id =>
                 {
@@ -879,8 +891,6 @@ namespace SchoolyConnect
         }
 
 
-        
-
         public string SaveSolution(bool final)
         {
             Solution solution = new Solution(SolutionId, final);
@@ -890,10 +900,13 @@ namespace SchoolyConnect
                 {
                     solution.courses.Add(new SolutionLine(sl.group_id, sl.day, sl.slot));
                 });
+                course.Solution.Clear(); //  because we are submitting interm. solutions.
+
             });
 
             string postData = JsonConvert.SerializeObject(solution);
             return connect.Http("solution/save", postData);
+            
         }
     }
 }

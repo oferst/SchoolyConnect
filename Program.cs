@@ -2,6 +2,8 @@
 using SchoolyConnect;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
 
 namespace CourseScheduling
@@ -13,11 +15,17 @@ namespace CourseScheduling
     {
 
         public enum mode { JSONFile, Local, ServerLoop}
-        static public mode flag_mode = mode.ServerLoop;
+        static public mode flag_mode = mode.ServerLoop;// ;
 
         static public bool flag_ChooseFreeDayForTeachers = false;        
-        static public bool flag_SoftnoOverlap = false; //true;
+        static public bool flag_SoftnoOverlap = false;
         static public bool flag_filter = true;
+
+        static void ResetStaus(string solution_id = "rb43wp3XhNjWL3RaY")//"2NkgMZLh9RyaRXbhD")
+        {
+            Connect con = new Connect();
+            con.SetStatus(solution_id, "submit");
+        }
 
         // note that for this to work 
         // 1) for exam scheduling the specialdays table should be correct, and the hard constraints for the exams should be updated. 
@@ -35,6 +43,13 @@ namespace CourseScheduling
 
             if (flag_mode == mode.ServerLoop)
             {
+                ResetStaus(); // temporary                 
+
+                Solver solver = new Solver(solvers.NaPS);
+                GlobalVar.SolversTeam.Add(solver);                
+                GlobalVar.goalPercent = GlobalVar.initGoalPercent = 1.0f;
+
+
                 Connect con = new Connect();
                 /******************* Check for pending requests *******************/
                 con.PollRequests();
@@ -49,6 +64,8 @@ namespace CourseScheduling
                         sched.Log("Pending Requests:");
                         sched.Log(request.AsString());
                         string jsonString = con.GetRequestData(request.solution_id);
+                        using (StreamWriter file = new StreamWriter("../../data/in/from_server.json"))
+                         file.WriteLine(jsonString);
                         sched.m.fromJSONString(jsonString);
 
                         /* notify server, solution in progress */
@@ -62,6 +79,7 @@ namespace CourseScheduling
                     }
                 });
                 MessageBox.Show("Ended request Loop");
+                GlobalVar.close_log();
                 return;
             }
 
@@ -75,6 +93,7 @@ namespace CourseScheduling
                 {   
                     // here we need to implement the equivalent of Utils.populate_what_to_schedule(i);
                     string suffix = i == 0? "" : "_" + i.ToString();
+
                     m = new MainForm(new schoolScheduling());
                     m.createBenchmarks(suffix);                      
                 }
@@ -84,8 +103,6 @@ namespace CourseScheduling
 
 
             
-
-
             string title = " "; 
             List<string> schedulers = new List<string> {"לוח שעות"};
             try
@@ -95,9 +112,24 @@ namespace CourseScheduling
                 {
                     if (GlobalVar.solutiobFile != "") 
                         if (MessageBox.Show("This will read the solution file, and populate the tables. Continue? ", "Import", MessageBoxButtons.OKCancel) == DialogResult.Cancel) return;
-                    MainForm m = null;
-                    m = new MainForm(new schoolScheduling()); 
-                    m.ShowDialog();
+
+                    schoolScheduling sched = new schoolScheduling();
+                    sched.m = new TieSchedModel();
+
+                    if (flag_mode == Program.mode.JSONFile)
+                    {
+                        string fileName = @"../../data/in/from_server.json";// arlozerov.json";
+                        sched.m.fromJSONFile(fileName);
+                    }
+                    else
+                    {
+                        Debug.Assert(flag_mode == mode.Local);
+                        sched.m.fromJSONFile("");
+                    }
+
+                    MainForm mf = null;
+                    mf = new MainForm(sched); 
+                    mf.ShowDialog();
                 }
             }
             catch (Exception ex)
