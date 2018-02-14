@@ -172,7 +172,7 @@ namespace SchoolyConnect
                 if (slot > 8 && Course_Type != COURSE_TYPE_ENUM.S) return false;
                 if (slot > 8 && Course_Type == COURSE_TYPE_ENUM.S) return false;
                 // last hours are soft-constrained
-                if ((slot == 8 || slot == 7) && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
+                if (slot >= 6 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
                 if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;
                 //if (!t.is_on(day, slot))  // original
 

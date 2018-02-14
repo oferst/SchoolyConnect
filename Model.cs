@@ -300,8 +300,9 @@ namespace SchoolyConnect
                     new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
                 });
             // note that in the negativeDisplayString we put the original course c1 and not c1r
-            if (soft && hour == 7) c.Weight = 1; // TODO: move to config. constants
-            if (soft && hour == 8) c.Weight = 2;
+            if (soft && hour == 6) c.Weight = 1; // TODO: move to config. constants
+            if (soft && hour == 7) c.Weight = 2;
+            if (soft && hour == 8) c.Weight = 3;
             if (c1.Id != c1r.Id)
                 Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
             else
