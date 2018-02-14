@@ -345,6 +345,11 @@ namespace SchoolyConnect
             return courses.Find(x=> x.Id == id.ToString());
         }
 
+        public _Course getCourseContained(string id) // here we send it a string that contains the courseid, e.g. P_xyz_1 where the id is xyz
+        {
+            return courses.Find(x => id.Contains(x.Id));
+        }
+
         _Teacher getTeacher(string id)
         {
             return teachers.Find(x => x.Id == id.ToString());

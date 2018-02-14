@@ -98,21 +98,29 @@ namespace CourseScheduling
                     Log("violated: " + c.NegativeDisplayString);
                     if (!covered)
                     {
-                        m.uncoveredCourses.Add(keys.First());
-                        // heck. Assumse that the d/h pair we need for later is either at locations 0,1, or 2,3
-                        if (l[0].Name.Contains(keys.First())) tryFix[keys.First()] = new Tuple<Variable, Variable>(l[0],l[1]);
-                        else tryFix[keys.First()] = new Tuple<Variable, Variable>(l[2], l[3]);
+                        string key = keys.First();
+                        m.uncoveredCourses.Add(key);
+                        Variable vd = l.Find(v1 => v1.Name == ("d_" + key));                        
+                        Variable vh = l.Find(v1 => v1.Name == ("h_" + key));
+                        tryFix[keys.First()] = new Tuple<Variable, Variable>(vd,vh);                        
                     }
                 }
             }
             Log("# Uncovered courses: " + m.uncoveredCourses.Count);
 
-            // fixSolution(csp, cspSolution, tryFix); needs to be fixed.
-
+            if (Program.flag_SoftnoOverlap) // todo: also close gaps in other cases
+                fixSolution(csp, cspSolution, tryFix); //needs to be fixed.
+            fixHoles(csp, cspSolution);
             return res;
         }
 
-
+        /// <summary>
+        /// When we run with flag_SoftnoOverlap sometimes we can place those courses that violate the constraints in 
+        /// vacant slots that do not violate any hard constraint. 
+        /// </summary>
+        /// <param name="csp"></param>
+        /// <param name="cspSolution"></param>
+        /// <param name="tryFix">List of variables to try and fix, compatible with the (string) entries in m.uncoveredCourses </param>
         void fixSolution(SimpleCSP csp, Hashtable cspSolution, Dictionary<string, Tuple<Variable, Variable>> tryFix)
         {
             
@@ -120,11 +128,15 @@ namespace CourseScheduling
             foreach (string course in m.uncoveredCourses)
             {
                 Variable vd = tryFix[course].Item1, vh = tryFix[course].Item2;
+                int currentDay = (int)cspSolution[vd];
+                int currentHour = (int)cspSolution[vh];
+
                 int best_day = -1, best_hour = -1, fine = 100;
                 for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     {                                                
-                        if (vd.Domain.Last < h) continue;
+                        if (vh.Domain.Last < h) continue;
+                        
                         cspSolution[vd] = d;                        
                         cspSolution[vh] = h;
                         bool fail = false;
@@ -132,7 +144,9 @@ namespace CourseScheduling
                         foreach (Constraint c in csp.Constraints)
                         {
                             if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
-                            if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT)
+                            if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT ||
+                               (Program.flag_SoftnoOverlap && (c.NegativeDisplayString.Contains("no-overlap")))                                
+                               )
                             {
                                 fail = true;
                                 break;
@@ -144,24 +158,156 @@ namespace CourseScheduling
                             fine = slot_fine;
                             best_day = d;
                             best_hour = h;
-                        }
+                        }                       
                     }
 
                 if (best_day >=0) // found a slot for course
                 {
                     solved.Add(course);
-                    Log("Solved " + course + ":" + best_day + "," + best_hour);                    
+                    Log("Solved " + m.getCourseContained(course).Name + ":" + best_day + "," + best_hour);                    
                     
                     cspSolution[vd] = best_day;
                     cspSolution[vh] = best_hour;
                 }
+                else
+                {
+                    // bringing back to the way it was
+                    cspSolution[vd] = currentDay;
+                    cspSolution[vh] = currentHour;
+                }
             }
-            m.uncoveredCourses = new HashSet<string>(m.uncoveredCourses.Except(solved));
-            Log("After fixing, # of uncovered courses: " + m.uncoveredCourses.Count);
-
+            m.uncoveredCourses = new HashSet<string>(m.uncoveredCourses.Except(solved)); // This is set-minus
+            Log("After fixSolution, # of uncovered courses: " + m.uncoveredCourses.Count);
         }
 
+        Variable getVarInSolution(Hashtable cspSolution, string name)
+        {
+            foreach (Variable v in cspSolution.Keys) if (v.Name == name) return v;
+            Debug.Assert(false);
+            return null;
+        }
 
-        
+        /// <summary>
+        /// What course/group is scheduled at day d, hour h for class cl
+        /// </summary>
+        /// <param name="cspSolution"></param>
+        /// <param name="cl"></param>
+        /// <param name="d"></param>
+        /// <param name="h"></param>
+        /// <returns></returns>
+        Tuple<Variable, Variable> groupAtHour(Hashtable cspSolution, _Class cl, int d, int h)
+        {
+            foreach (_Course c in m.courses)
+            {
+                if (!c.Classes.Contains(cl)) continue;
+                if (c != m.rep(c)) continue;
+                
+                for (int g = 0; g < c.Hours; ++g)
+                {
+                    string
+                        dv = m.CourseVarName(true, c.Course_Type, c.Id, g),
+                        hv = m.CourseVarName(false, c.Course_Type, c.Id, g);
+                    if (m.uncoveredCourses.Contains(dv.Substring(2))) continue;  
+                    Variable vd = getVarInSolution(cspSolution, dv);
+                    if ((int)cspSolution[vd] != d) continue;
+                    Variable vh = getVarInSolution(cspSolution, hv);
+                    if ((int)cspSolution[vh] != h) continue;                  
+                    return new Tuple<Variable, Variable>(vd, vh);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Total sum of weights of broken soft constraints, or -if it breaks a hard constraint. this is 
+        /// supposed to happen only because we changed the schedule for trying it. 
+        /// </summary>
+        /// <param name="csp"></param>
+        /// <param name="cspSolution"></param>
+        /// <returns></returns>
+        int evaluate(SimpleCSP csp, Hashtable cspSolution)
+        {   
+            int slot_fine = 0;
+            foreach (Constraint c in csp.Constraints)
+            {
+                if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
+                if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT) return -1;
+                if (Program.flag_SoftnoOverlap && (c.NegativeDisplayString.Contains("no-overlap")))
+                {
+                    // check if it involves one of the variables that we are not reporting 
+                    List<Variable> list = c.getVars();
+                    bool ok = false;
+                    foreach (var v in list)
+                        foreach (string st in m.uncoveredCourses)
+                    {
+                            if (v.Name.Contains(st)) ok = true;                        
+                    }
+                    if (!ok) return -1;
+                    continue;
+                }
+                slot_fine += c.Weight;
+            }
+            return slot_fine;
+        }
+
+        /// <summary>
+        /// Attempt to fill gaps in the schedule. 
+        /// </summary>
+        /// <param name="csp"></param>
+        /// <param name="cspSolution"></param>
+        void fixHoles(SimpleCSP csp, Hashtable cspSolution)
+        {
+            int gain = 0;
+            foreach (_Class cl in m.classes)
+            {  
+                for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                    for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                    {
+                        var T = groupAtHour(cspSolution, cl, d, h);
+                        if (T != null) continue;
+
+                        // found a gap                                           
+
+                        // We can pay up to Program.gapWeight for closing this gap:
+                        int fine = evaluate(csp, cspSolution) + Program.gapWeight;
+                        Debug.Assert(fine >= 0); 
+
+                        // Now searching for a filler from the late hours (not before hour 6)
+                        int currentDay, currentHour;
+                        Variable best_day = null, best_hour = null;
+                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > Math.Max(5,h+1) ; --hh)
+                            for (int dd = 0; dd < _ObjectWithTimeTable.MAX_DAY; ++dd)
+                            {
+                                var TT = groupAtHour(cspSolution, cl, dd, hh);
+                                if (TT == null) continue;
+                                currentDay = (int)cspSolution[TT.Item1];
+                                currentHour = (int)cspSolution[TT.Item2];
+                                
+                                // Now fill TT into the gap and evaluate
+                                cspSolution[TT.Item1] = d;
+                                cspSolution[TT.Item2] = h;
+                                int res = evaluate(csp, cspSolution);
+                                
+                                if (res >=0 && res < fine) // found an improvement!
+                                {
+                                    gain += fine - res;
+                                    fine = res;
+                                    best_day = TT.Item1;
+                                    best_hour = TT.Item2;
+                                }
+                                
+                                cspSolution[TT.Item1] = currentDay;
+                                cspSolution[TT.Item2] = currentHour;
+                            }
+                        if (best_day != null)
+                        {
+                            Log("fixHoles: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day].ToString() + "," + cspSolution[best_hour].ToString() + ") => (" + d + "," + h + ")");
+                            cspSolution[best_day] = d;
+                            cspSolution[best_hour] = h;                            
+                        }
+                    }
+            }
+            Log("fixHoles reduced fine by " + gain);
+        }
     }
 }

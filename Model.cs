@@ -148,7 +148,7 @@ namespace SchoolyConnect
             return v;
         }
 
-        string CourseVarName(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
+        public string CourseVarName(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
         {
             return (day ? "d_" : "h_") + CourseVarName(type, courseID, group);
         }
@@ -167,7 +167,7 @@ namespace SchoolyConnect
         /// </summary>
         /// <param name="c"></param>
         /// <returns></returns>
-        _Course rep(_Course c)
+        public _Course rep(_Course c)
         {
             if (c.Clusters.Count == 0) return c;
             int max = 0;
@@ -483,7 +483,7 @@ namespace SchoolyConnect
                     var h = CourseVar(false, course.Course_Type, course.Id, g);
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
                     counter++;
-                    Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
+                    //Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
                 }
             Log("exported " + counter + " lines");
         }
