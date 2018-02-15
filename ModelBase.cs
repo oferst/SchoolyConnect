@@ -169,8 +169,13 @@ namespace SchoolyConnect
 
             if (Classes != null)
             {
-                if (slot > 8 && Course_Type != COURSE_TYPE_ENUM.S) return false;
-                if (slot > 8 && Course_Type == COURSE_TYPE_ENUM.S) return false;
+                if (slot > 8 ) return false;
+                // blocking 8th hour for Aleph
+                if (slot >= 7)
+                    foreach (_Class cl in Classes) if (cl.Name.Contains("א")) return false;
+                if (slot >= 8)
+                    foreach (_Class cl in Classes) if (cl.Name.Contains("ב")) return false;
+                
                 // last hours are soft-constrained
                 if (slot >= 6 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
                 if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;

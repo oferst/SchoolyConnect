@@ -251,7 +251,8 @@ namespace CourseScheduling
         }
 
         /// <summary>
-        /// Attempt to fill gaps in the schedule. 
+        /// Attempt to fill gaps in the schedule. Very naive: only searches for gaps in early hours, and then 
+        /// searches for a filler from late hours, all within the same class.
         /// </summary>
         /// <param name="csp"></param>
         /// <param name="cspSolution"></param>
@@ -269,13 +270,13 @@ namespace CourseScheduling
                         // found a gap                                           
 
                         // We can pay up to Program.gapWeight for closing this gap:
-                        int fine = evaluate(csp, cspSolution) + Program.gapWeight;
+                        int fine = evaluate(csp, cspSolution) + Program.weight_gap;
                         Debug.Assert(fine >= 0); 
 
                         // Now searching for a filler from the late hours (not before hour 6)
                         int currentDay, currentHour;
                         Variable best_day = null, best_hour = null;
-                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > Math.Max(5,h+1) ; --hh)
+                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > Math.Max(5,h) ; --hh)
                             for (int dd = 0; dd < _ObjectWithTimeTable.MAX_DAY; ++dd)
                             {
                                 var TT = groupAtHour(cspSolution, cl, dd, hh);

@@ -352,7 +352,8 @@ namespace SchoolyConnect
             foreach (_Teacher t in teachers)
             {
                 List<_Course> tHomeCourses = new List<_Course>();
-                // t's list of courses he teachers his own class
+                if (t.MyClass == null) continue;
+                // t's list of courses he teaches his own class
                 foreach (_Course c in courses)
                 {
                     if (!c.Classes.Contains(t.MyClass)) continue; // course not given to t's class. 
@@ -437,7 +438,9 @@ namespace SchoolyConnect
                 if (c.Course_Type != COURSE_TYPE_ENUM.F) continue;
                 if (c.Hours <= 1) continue;
                 if (c.Max_Daily_Hours >= c.Hours) continue;
-                //if (c.Max_Daily_Hours != 1) continue; // !!
+                Debug.Assert(c.Max_Daily_Hours > 0);
+                if (!Program.flag_constrainAllMaxHours && c.Max_Daily_Hours != 1) continue; 
+
                 List<_Teacher> classHomeTeachers = new List<_Teacher>();
                 foreach (_Class cl in c.Classes) classHomeTeachers.Add(cl.myTeacher);
                 if (c.Teachers.Intersect(classHomeTeachers).Any()) continue; // if a homeTeacher of one of c's classes teaches this course, then we do not apply restrictions.
@@ -445,6 +448,54 @@ namespace SchoolyConnect
 
                 // con_maxHoursExact(c);
                 con_maxHours(c);
+            }
+        }
+
+/// <summary>
+/// Soft constraint: non-home-teacher courses should be given on the home-teacher free day.  
+/// </summary>
+        void con_HomeTeacherAbsentDay()
+        {
+            foreach (_Teacher t in teachers)
+            {
+                List<_Course> tNonHomeCourses = new List<_Course>(); // The courses given to class A, not by A's home-Teacher. 
+                if (t.MyClass == null) continue;
+                // t's list of courses he teaches his own class
+                foreach (_Course c in courses)
+                {
+                    if (!c.Classes.Contains(t.MyClass)) continue; // course not given to t's class. 
+                    if (c.Teachers.Contains(t)) continue; // t is not the teacher of that course
+                    tNonHomeCourses.Add(c);
+                }
+                // we now search for T's free day
+                for (int d = 1; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                {
+                    bool on_thatDay = false;
+                    // checking t's availability on that day
+                    for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                    {
+                        if (t.is_on(d, h))
+                        {
+                            on_thatDay = true;
+                            break;
+                        }
+                    }
+                    if (!on_thatDay)
+                    {
+                        foreach (_Course c in tNonHomeCourses)
+                        {
+                            for (int g = 0; g < c.Hours; ++g)
+                            {
+                                Variable vd = CourseVar(true, c.Course_Type, c.Id, g);
+                                VarValConstraint con = new VarValConstraint(vd, d, ArithmeticalOperator.EQ, Program.weight_nonHomeTeacherCoursesonFreeDay);
+                                con.NegativeDisplayString = "HomeTeacherAbsentDay: (" + c.Name + ", group " + g + " day = " + d + ")";
+                                Log(con.NegativeDisplayString);
+                                Csp.Constraints.Add(con);
+                            }
+
+                        }
+                    }
+                }
             }
         }
 
@@ -457,10 +508,8 @@ namespace SchoolyConnect
             con_maxHours();
             con_noOverlap();
             con_off();
-
-
-
-            // Soft constraints:
+            con_HomeTeacherAbsentDay();
+                        
             //con_ActiveOnDay();
 
             return Csp;

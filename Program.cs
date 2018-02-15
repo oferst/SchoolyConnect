@@ -18,10 +18,12 @@ namespace CourseScheduling
         static public mode flag_mode = mode.JSONFile;// ServerLoop;// ;
 
         static public bool flag_ChooseFreeDayForTeachers = false;        
-        static public bool flag_SoftnoOverlap = true;
+        static public bool flag_SoftnoOverlap = false;
         static public bool flag_filter = true;
+        static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
 
-        static public int gapWeight = 5; // the weight of a gap
+        static public int weight_gap = 5; // the weight of a gap
+        static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the weight of a gap
 
         static void ResetStaus(string solution_id = "rb43wp3XhNjWL3RaY")//"2NkgMZLh9RyaRXbhD")
         {
