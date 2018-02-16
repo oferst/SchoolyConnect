@@ -30,8 +30,11 @@ namespace CourseScheduling
             if (Program.flag_mode == Program.mode.JSONFile || Program.flag_mode == Program.mode.ServerLoop)
             {
                 m.printSolution();
-                string receipt = m.SaveSolution(true);
-                Log("Solution sent. Receipt = " + receipt);
+                if (Program.flag_sendSolution)
+                {
+                    string receipt = m.SaveSolution(true);
+                    Log("Solution sent. Receipt = " + receipt);
+                }
             }
             else
             {
@@ -232,6 +235,7 @@ namespace CourseScheduling
             {
                 if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
                 if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT) return -1;
+                
                 if (Program.flag_SoftnoOverlap && (c.NegativeDisplayString.Contains("no-overlap")))
                 {
                     // check if it involves one of the variables that we are not reporting 
@@ -268,15 +272,16 @@ namespace CourseScheduling
                         if (T != null) continue;
 
                         // found a gap                                           
-
+                   
                         // We can pay up to Program.gapWeight for closing this gap:
                         int fine = evaluate(csp, cspSolution) + Program.weight_gap;
+                   
                         Debug.Assert(fine >= 0); 
 
                         // Now searching for a filler from the late hours (not before hour 6)
                         int currentDay, currentHour;
-                        Variable best_day = null, best_hour = null;
-                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > Math.Max(5,h) ; --hh)
+                        Variable best_day = null, best_hour = null, best_x = null;
+                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > h ; --hh)
                             for (int dd = 0; dd < _ObjectWithTimeTable.MAX_DAY; ++dd)
                             {
                                 var TT = groupAtHour(cspSolution, cl, dd, hh);
@@ -287,6 +292,11 @@ namespace CourseScheduling
                                 // Now fill TT into the gap and evaluate
                                 cspSolution[TT.Item1] = d;
                                 cspSolution[TT.Item2] = h;
+                                // update the x variables accordingly:
+                                Variable xv1 = m.ClassXVar(cl.Id, d, h), 
+                                         xv2 = m.ClassXVar(cl.Id, dd, hh);
+                                cspSolution[xv1] = 1;                                
+                                cspSolution[xv2] = 0;
                                 int res = evaluate(csp, cspSolution);
                                 
                                 if (res >=0 && res < fine) // found an improvement!
@@ -295,16 +305,22 @@ namespace CourseScheduling
                                     fine = res;
                                     best_day = TT.Item1;
                                     best_hour = TT.Item2;
+                                    best_x = xv2;
                                 }
                                 
                                 cspSolution[TT.Item1] = currentDay;
                                 cspSolution[TT.Item2] = currentHour;
+                                cspSolution[xv1] = 0;
+                                cspSolution[xv2] = 1;
                             }
                         if (best_day != null)
                         {
                             Log("fixHoles: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day].ToString() + "," + cspSolution[best_hour].ToString() + ") => (" + d + "," + h + ")");
                             cspSolution[best_day] = d;
-                            cspSolution[best_hour] = h;                            
+                            cspSolution[best_hour] = h;
+                            Variable xv1 = m.ClassXVar(cl.Id, d, h);                                        
+                            cspSolution[xv1] = 1;
+                            cspSolution[best_x] = 0;
                         }
                     }
             }

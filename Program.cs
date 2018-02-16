@@ -16,6 +16,8 @@ namespace CourseScheduling
 
         public enum mode { JSONFile, Local, ServerLoop}
         static public mode flag_mode = mode.JSONFile;// ServerLoop;// ;
+        static public bool flag_sendSolution = true;
+        static bool flag_debugConstraints = false;
 
         static public bool flag_ChooseFreeDayForTeachers = false;        
         static public bool flag_SoftnoOverlap = false;
@@ -44,6 +46,7 @@ namespace CourseScheduling
         private static void Main(string[] args)  // no use for args currently
         {
             GlobalVar.Init(); // initializes the log file. 
+            if (flag_debugConstraints) GlobalVar.debug_constraints = true;
 
             if (flag_mode == mode.ServerLoop)
             {
@@ -122,7 +125,7 @@ namespace CourseScheduling
 
                     if (flag_mode == Program.mode.JSONFile)
                     {
-                        string fileName = @"../../data/in/from_server.json";// arlozerov.json";
+                        string fileName = @"../../data/in/arlozerov.json";// from_server.json";// ";
                         sched.m.fromJSONFile(fileName);
                     }
                     else

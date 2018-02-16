@@ -138,8 +138,7 @@ namespace SchoolyConnect
             }
             Log("**********************************************************");
         }
-
-
+        
         Variable CourseVar(bool day, COURSE_TYPE_ENUM type, string courseID, int group)
         {
             Variable v = (Variable)(day ? courseDVars : courseHVars)[CourseVarName(day, type, courseID, group)];
@@ -158,6 +157,18 @@ namespace SchoolyConnect
             return (type == COURSE_TYPE_ENUM.F ? "" : type.ToString() + "_") + courseID + "_" + group.ToString();
         }
 
+        string ClassXVarName(string ID, int day, int hour)
+        {
+            return "x_" + ID + "_" + day.ToString() + "_" + hour.ToString();
+
+        }
+        public Variable ClassXVar(string ID, int day, int hour)
+        {
+            Variable v = (Variable)(courseDVars)[ClassXVarName(ID, day, hour)];
+            if (v == null)
+                throw new Exception("Problem with XVar: " + ID + "," + day + "," + hour);
+            return v;
+        }
 
 
         /// <summary>
@@ -499,6 +510,69 @@ namespace SchoolyConnect
             }
         }
 
+       /// <summary>
+       /// Explicit no-gap constraints. 
+       /// </summary>
+        void con_gaps()
+        {
+            Domain domx = new Domain(0, 1);
+            
+            foreach (_Class cl in classes)
+            {
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                {
+                    Variable prev_vx = null;
+                    for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
+                    {
+                        CompositeConstraint disj = new CompositeConstraint(BooleanOperator.OR);
+                        foreach (_Course c in courses)
+                        {
+                            if (c != rep(c)) continue;
+                            for (int g = 0; g < c.Hours; ++g)
+                            {
+                                if (!c.Classes.Contains(cl)) continue;
+                                Variable vd = CourseVar(true, c.Course_Type, c.Id, g);
+                                Variable vh = CourseVar(false, c.Course_Type, c.Id, g);
+                                CompositeConstraint conj = new CompositeConstraint(BooleanOperator.AND);
+                                conj.SubConstraints.Add(new VarValConstraint(vd, d, ArithmeticalOperator.EQ));
+                                conj.SubConstraints.Add(new VarValConstraint(vh, h, ArithmeticalOperator.EQ));
+                                disj.SubConstraints.Add(conj);
+                            }
+                        }
+                        if (disj.SubConstraints.Count == 0) continue;
+                        Variable vx = new  Variable(ClassXVarName(cl.Id, d, h), domx);
+                        courseDVars[vx.Name] = vx;
+                        // x-> disj
+                        CompositeConstraint dir1 = new CompositeConstraint(BooleanOperator.OR);
+                        dir1.SubConstraints.Add(new VarValConstraint(vx, 0, ArithmeticalOperator.EQ)); // !x 
+                        dir1.SubConstraints.Add(disj);
+                        // disj -> x
+                        CompositeConstraint dir2 = new CompositeConstraint(BooleanOperator.OR);
+                        dir2.SubConstraints.Add(new VarValConstraint(vx, 1, ArithmeticalOperator.EQ)); // x 
+                        dir2.SubConstraints.Add(new CompositeConstraint(BooleanOperator.NOT, disj));
+                        dir1.NegativeDisplayString = dir2.NegativeDisplayString = "gap:\n\t" + cl.Name + ",\n\t" + d + "," + h;
+
+                        Log(dir1.NegativeDisplayString);
+                        Csp.Constraints.Add(dir1);
+                        Csp.Constraints.Add(dir2);
+                        if (h == 1) prev_vx = vx;
+                        else
+                        {
+                            // vx => prev_vx
+                            CompositeConstraint implication = new CompositeConstraint(BooleanOperator.OR);
+                            implication.SubConstraints.Add(new VarValConstraint(vx, 0, ArithmeticalOperator.EQ)); // !vx
+                            implication.SubConstraints.Add(new VarValConstraint(prev_vx, 1, ArithmeticalOperator.EQ));
+                            implication.NegativeDisplayString = "prevent gap: \n\t" + cl.Name + "\n\t," + d + "," + h + " => " + d + "," + (h - 1);
+                            Log(implication.NegativeDisplayString);
+                            Csp.Constraints.Add(implication);
+                            prev_vx = vx;
+                        }
+                    }                    
+                }
+            }
+        }
+
+
         /*************************   TieLib interface ***************************/
 
         public SimpleCSP Translate()
@@ -509,7 +583,8 @@ namespace SchoolyConnect
             con_noOverlap();
             con_off();
             con_HomeTeacherAbsentDay();
-                        
+
+            con_gaps();
             //con_ActiveOnDay();
 
             return Csp;
@@ -525,6 +600,7 @@ namespace SchoolyConnect
                 {
                     _Course course = rep(c); // taking the schedule of the cluster's representative. 
                     var d = CourseVar(true, course.Course_Type, course.Id, g);
+                    
                     if (uncoveredCourses.Contains(d.Name.Substring(2)))
                     {
                         Log("Not reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : ""));
@@ -535,6 +611,16 @@ namespace SchoolyConnect
                     counter++;
                     //Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
                 }
+            _Class cl = classes[1];
+            Log("classses[1] =" +  cl.Name);
+            int day = 0;
+            for (int h = 1; h < 10; ++h)
+            {
+                Variable x = ClassXVar(cl.Id, day, h);
+                Log("h = " + h + ":" + (int)cspSolution[x]);
+            }
+
+
             Log("exported " + counter + " lines");
         }
 

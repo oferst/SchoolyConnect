@@ -167,15 +167,25 @@ namespace SchoolyConnect
             }
             if (Rooms != null) foreach (var t in Rooms) if (!t.is_on(day, slot)) return false;
 
+
             if (Classes != null)
             {
                 if (slot > 8 ) return false;
                 // blocking 8th hour for Aleph
-                if (slot >= 7)
-                    foreach (_Class cl in Classes) if (cl.Name.Contains("א")) return false;
-                if (slot >= 8)
-                    foreach (_Class cl in Classes) if (cl.Name.Contains("ב")) return false;
+/*                if (slot >= 7) foreach (_Class cl in Classes)
+                        if (cl.Name.Contains("א")
+                           || cl.Name.Contains("ב")) return false;
+
+                if (slot == 8)
+                    foreach (_Class cl in Classes)
+                        if (  
+                             cl.Name.Contains("ג")
+                            || cl.Name.Contains("ד")
+                            || cl.Name.Contains("ה")
+                            ) return false;
+                            */
                 
+               
                 // last hours are soft-constrained
                 if (slot >= 6 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
                 if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;
@@ -534,11 +544,11 @@ namespace SchoolyConnect
                         if (
                                 false
                              || cl.Name.Contains("א")
-                             || cl.Name.Contains("ב")
+                           || cl.Name.Contains("ב")
                              || cl.Name.Contains("ג")
                              || cl.Name.Contains("ד")
                              || cl.Name.Contains("ה")
-                             || cl.Name.Contains("ו")
+                           || cl.Name.Contains("ו")
                         //|| cl.Name.Contains("ו2")
                         //|| cl.Name.Contains("ו3")
                         //|| cl.Name.Contains("ו4")
