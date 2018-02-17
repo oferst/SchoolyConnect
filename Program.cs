@@ -14,18 +14,27 @@ namespace CourseScheduling
     internal sealed class Program
     {
 
+        // general flags
         public enum mode { JSONFile, Local, ServerLoop}
         static public mode flag_mode = mode.JSONFile;// ServerLoop;// ;
         static public bool flag_sendSolution = true;
         static bool flag_debugConstraints = false;
+        static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
+        static public bool flag_rerun = false; // attempt to re-run after adding constraints based on the previous solution.
 
+        // modeling flags
         static public bool flag_ChooseFreeDayForTeachers = false;        
         static public bool flag_SoftnoOverlap = false;
         static public bool flag_filter = true;
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
 
-        static public int weight_gap = 5; // the weight of a gap
-        static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the weight of a gap
+        // weights
+        static public int weight_gap = 5; // when flag_postProcess=true, this is the value of covering an early hour.
+        static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the value of placing non-home-teachers on the hom-teacher's free day. 
+        static public int weight_homeTeacherOnLateHour = 2;
+        static public int weight_hour6 = 1;
+        static public int weight_hour7 = 2;
+        static public int weight_hour8 = 3;
 
         static void ResetStaus(string solution_id = "rb43wp3XhNjWL3RaY")//"2NkgMZLh9RyaRXbhD")
         {
@@ -82,7 +91,7 @@ namespace CourseScheduling
 
                         MainForm m = null;
                         m = new MainForm(sched);
-                        m.ShowDialog();                        
+                        m.ShowDialog();                      
                     }
                 });
                 MessageBox.Show("Ended request Loop");
@@ -137,6 +146,12 @@ namespace CourseScheduling
                     MainForm mf = null;
                     mf = new MainForm(sched); 
                     mf.ShowDialog();
+                    if (flag_rerun)
+                    {
+                        GlobalVar.solutiobFile = "";
+                        mf = new MainForm(sched);
+                        mf.ShowDialog();
+                    }
                 }
             }
             catch (Exception ex)

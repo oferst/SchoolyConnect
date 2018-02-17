@@ -81,7 +81,7 @@ namespace SchoolyConnect
     {
         private _Class myClass;
         public _Class MyClass { get => myClass; set => myClass = value; }
-        public _Teacher() : base() // ofer changed to public
+        public _Teacher() : base() 
         {
             freeDay = -1;
         }
@@ -91,8 +91,8 @@ namespace SchoolyConnect
     public class _Class : _ObjectWithTimeTable
     {
         public _Teacher myTeacher;
-
-        public _Class (_Teacher t) : base() // ofer changed to public
+        public List<_Course> courses = new List<_Course>(); // The courses taken by the class.
+        public _Class (_Teacher t) : base() 
         {
             myTeacher = t;            
         }
@@ -544,11 +544,11 @@ namespace SchoolyConnect
                         if (
                                 false
                              || cl.Name.Contains("א")
-                           || cl.Name.Contains("ב")
-                             || cl.Name.Contains("ג")
-                             || cl.Name.Contains("ד")
-                             || cl.Name.Contains("ה")
-                           || cl.Name.Contains("ו")
+                             || cl.Name.Contains("ב")
+    //                         || cl.Name.Contains("ג")
+  //                           || cl.Name.Contains("ד")
+//                             || cl.Name.Contains("ה")
+                           //|| cl.Name.Contains("ו")
                         //|| cl.Name.Contains("ו2")
                         //|| cl.Name.Contains("ו3")
                         //|| cl.Name.Contains("ו4")
@@ -572,6 +572,13 @@ namespace SchoolyConnect
                 /*************************************************/
 
                 _Course c = addCourse(id, name, course_type, hours, max_daily_hours);
+
+                // filling each class' courses.
+                class_ids.ForEach(class_id =>
+                {
+                    _Class cl = classes.Find(clazz => clazz.Id == class_id.ToString());
+                    cl.courses.Add(c);
+                });
 
                 c.Subject = subjects.Find(x => x.Id == subject.ToString());
                                         

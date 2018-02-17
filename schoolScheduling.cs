@@ -40,6 +40,7 @@ namespace CourseScheduling
             {
                 m.printSolution();
             }
+            cspSolution.Clear();
         }
 
         override public string name_for_benchmrks()
@@ -51,7 +52,12 @@ namespace CourseScheduling
 
 
         override public SimpleCSP TranslateToCSP() // main function for adding constraints **
-        {        
+        {
+            if (m.Csp.Constraints.Count() > 0)
+            {
+                Debug.Assert(Program.flag_rerun);
+                return m.Csp; // for the rerun
+            }
             return m.Translate();
         }
 
@@ -59,6 +65,7 @@ namespace CourseScheduling
         public override string CheckSolution(SimpleCSP csp, Hashtable cspSolution)
         {
             //Status("Checking consistency with the hard constraints (as reflected in the current database), and making the list of broken soft constraints...");
+            Log("# constraints = " + csp.Constraints.Count.ToString());
             Dictionary<string, Tuple<Variable, Variable>> tryFix = new Dictionary<string, Tuple<Variable, Variable>>();
             m.uncoveredCourses.Clear();
             string res = "";            
@@ -113,7 +120,15 @@ namespace CourseScheduling
 
             if (Program.flag_SoftnoOverlap) // todo: also close gaps in other cases
                 fixSolution(csp, cspSolution, tryFix); //needs to be fixed.
-            fixHoles(csp, cspSolution);
+            if (Program.flag_postProcess) while (fixGaps(csp, cspSolution) > 0);
+            if (Program.flag_rerun)
+            {
+                Log("Rerun: # constraints before = " + csp.Constraints.Count.ToString());
+                reRun(csp, cspSolution);                
+                m.Csp = csp; // saving it for the next run
+                Log("Rerun: # constraints after = " + csp.Constraints.Count.ToString());
+            }
+
             return res;
         }
 
@@ -182,13 +197,7 @@ namespace CourseScheduling
             m.uncoveredCourses = new HashSet<string>(m.uncoveredCourses.Except(solved)); // This is set-minus
             Log("After fixSolution, # of uncovered courses: " + m.uncoveredCourses.Count);
         }
-
-        Variable getVarInSolution(Hashtable cspSolution, string name)
-        {
-            foreach (Variable v in cspSolution.Keys) if (v.Name == name) return v;
-            Debug.Assert(false);
-            return null;
-        }
+                
 
         /// <summary>
         /// What course/group is scheduled at day d, hour h for class cl
@@ -200,9 +209,8 @@ namespace CourseScheduling
         /// <returns></returns>
         Tuple<Variable, Variable> groupAtHour(Hashtable cspSolution, _Class cl, int d, int h)
         {
-            foreach (_Course c in m.courses)
-            {
-                if (!c.Classes.Contains(cl)) continue;
+            foreach (_Course c in cl.courses)
+            {                
                 if (c != m.rep(c)) continue;
                 
                 for (int g = 0; g < c.Hours; ++g)
@@ -211,9 +219,9 @@ namespace CourseScheduling
                         dv = m.CourseVarName(true, c.Course_Type, c.Id, g),
                         hv = m.CourseVarName(false, c.Course_Type, c.Id, g);
                     if (m.uncoveredCourses.Contains(dv.Substring(2))) continue;  
-                    Variable vd = getVarInSolution(cspSolution, dv);
+                    Variable vd = (Variable)m.getCourseDVars[dv];
                     if ((int)cspSolution[vd] != d) continue;
-                    Variable vh = getVarInSolution(cspSolution, hv);
+                    Variable vh = (Variable)m.getCourseHVars[hv];
                     if ((int)cspSolution[vh] != h) continue;                  
                     return new Tuple<Variable, Variable>(vd, vh);
                 }
@@ -260,14 +268,16 @@ namespace CourseScheduling
         /// </summary>
         /// <param name="csp"></param>
         /// <param name="cspSolution"></param>
-        void fixHoles(SimpleCSP csp, Hashtable cspSolution)
+        int fixGaps(SimpleCSP csp, Hashtable cspSolution)
         {
             int gain = 0;
             foreach (_Class cl in m.classes)
-            {  
+            {
+                bool[] daysCovered_up = new bool[_ObjectWithTimeTable.MAX_DAY];
                 for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     {
+                        if (daysCovered_up[d]) continue;
                         var T = groupAtHour(cspSolution, cl, d, h);
                         if (T != null) continue;
 
@@ -278,17 +288,23 @@ namespace CourseScheduling
                    
                         Debug.Assert(fine >= 0); 
 
-                        // Now searching for a filler from the late hours (not before hour 6)
-                        int currentDay, currentHour;
-                        Variable best_day = null, best_hour = null, best_x = null;
+                        // Now searching for a filler from the late hours
+                        int currentDay, currentHour, best_day = 0;
+                        Variable best_day_var = null, best_hour_var = null, best_x_var = null;
+
+                        // we only look for replacements if they do not create a gap. daysCovered[day]=true => the latest course on that day cannot be removed.
+                        bool[] daysCovered_down = new bool[_ObjectWithTimeTable.MAX_DAY];
                         for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > h ; --hh)
                             for (int dd = 0; dd < _ObjectWithTimeTable.MAX_DAY; ++dd)
                             {
+                                if (daysCovered_down[dd]) continue;
                                 var TT = groupAtHour(cspSolution, cl, dd, hh);
                                 if (TT == null) continue;
+                                daysCovered_down[dd] = true;
                                 currentDay = (int)cspSolution[TT.Item1];
                                 currentHour = (int)cspSolution[TT.Item2];
-                                
+                                Debug.Assert(currentDay == dd && currentHour == hh);
+
                                 // Now fill TT into the gap and evaluate
                                 cspSolution[TT.Item1] = d;
                                 cspSolution[TT.Item2] = h;
@@ -303,9 +319,10 @@ namespace CourseScheduling
                                 {
                                     gain += fine - res;
                                     fine = res;
-                                    best_day = TT.Item1;
-                                    best_hour = TT.Item2;
-                                    best_x = xv2;
+                                    best_day = dd;                                    
+                                    best_day_var = TT.Item1;
+                                    best_hour_var = TT.Item2;
+                                    best_x_var = xv2;
                                 }
                                 
                                 cspSolution[TT.Item1] = currentDay;
@@ -313,18 +330,65 @@ namespace CourseScheduling
                                 cspSolution[xv1] = 0;
                                 cspSolution[xv2] = 1;
                             }
-                        if (best_day != null)
+                        if (best_day_var != null)
                         {
-                            Log("fixHoles: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day].ToString() + "," + cspSolution[best_hour].ToString() + ") => (" + d + "," + h + ")");
-                            cspSolution[best_day] = d;
-                            cspSolution[best_hour] = h;
-                            Variable xv1 = m.ClassXVar(cl.Id, d, h);                                        
+                            Log("fixHoles: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day_var].ToString() + "," + cspSolution[best_hour_var].ToString() + ") => (" + d + "," + h + ")");
+                            cspSolution[best_day_var] = d;
+                            cspSolution[best_hour_var] = h;
+                            daysCovered_down[best_day] = false; // this is how we open the option of taking more than one course from the same day.
+                            Variable xv1 = m.ClassXVar(cl.Id, d, h);
                             cspSolution[xv1] = 1;
-                            cspSolution[best_x] = 0;
+                            cspSolution[best_x_var] = 0;
                         }
+                        else daysCovered_up[d] = true;
                     }
             }
             Log("fixHoles reduced fine by " + gain);
+            return gain;
         }
+
+
+        /// <summary>
+        /// Here we will add constraints to csp according to the part of cspSolution that we like, and restart the system. 
+        /// </summary>
+        void reRun(SimpleCSP csp, Hashtable cspSolution)
+        {
+            foreach(_Class cl in m.classes)
+            {
+                bool[,] schedule = new bool[_ObjectWithTimeTable.MAX_DAY,_ObjectWithTimeTable.MAX_HOUR];
+                foreach (_Course c in cl.courses)
+                {
+                    if (c != m.rep(c)) continue;
+                    for (int g = 0; g < c.Hours; ++g)
+                    {
+
+                        Variable vh = (Variable)m.getCourseHVars[m.CourseVarName(false, c.Course_Type, c.Id, g)];
+                        int h = (int)cspSolution[vh];
+                        // fixing everything up to hour 4.
+                        if (h <= 4)
+                        {
+                            Variable vd = (Variable)m.getCourseDVars[m.CourseVarName(true, c.Course_Type, c.Id, g)];
+                            int d = (int)cspSolution[vd];
+                            csp.Constraints.Add(new VarValConstraint(vd, d, ArithmeticalOperator.EQ));
+                            csp.Constraints.Add(new VarValConstraint(vh, h, ArithmeticalOperator.EQ));
+                        }
+                        //schedule[d, h] = true;
+                    }
+                }
+
+                //int minHour = _ObjectWithTimeTable.MAX_DAY;
+                //for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                //    for (int h = _ObjectWithTimeTable.MAX_HOUR - 1; h >=0; --h)
+                //    {
+                //        if (schedule[d,h])
+                //        {
+                //            if (h < minHour) minHour = h;
+                //            break;
+                //        }
+                //    }
+                //Log("minHour:\n\r" + cl.Name + "\n\t" + minHour);
+            }
+        }
+
     }
 }

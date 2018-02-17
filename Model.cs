@@ -10,8 +10,8 @@ namespace SchoolyConnect
 {
     class TieSchedCourse : _Course
     {
-        public string my_private_prop;        
-
+        public string my_private_prop;
+           
         public TieSchedCourse(_Course c) : base(c)
         {
             my_private_prop = "Created On " + DateTime.Now.ToLongTimeString();
@@ -30,7 +30,7 @@ namespace SchoolyConnect
         // Here we will fill courses that violate nooverlap constraints (should be hard constrained, but we make them soft).
         public HashSet<string> uncoveredCourses = new HashSet<string>();
 
-        SimpleCSP Csp;
+        public SimpleCSP Csp;
 
         /*************************   Init ***************************/
 
@@ -310,10 +310,13 @@ namespace SchoolyConnect
                     new VarValConstraint(vd,day,ArithmeticalOperator.NEQ),
                     new VarValConstraint(vh,hour,ArithmeticalOperator.NEQ)
                 });
+            if (soft && hour == 6) c.Weight = Program.weight_hour6; 
+            if (soft && hour == 7) c.Weight = Program.weight_hour7;
+            if (soft && hour == 8) c.Weight = Program.weight_hour8;
+            
+            if (soft && c1.Classes.Count > 0 && c1.Teachers.Count > 0 && c1.Teachers.Contains(c1.Classes[0].myTeacher))
+                c.Weight += Program.weight_homeTeacherOnLateHour; // we want home teachers to be early so we can later move others to the homeTecher's free day. 
             // note that in the negativeDisplayString we put the original course c1 and not c1r
-            if (soft && hour == 6) c.Weight = 1; // TODO: move to config. constants
-            if (soft && hour == 7) c.Weight = 2;
-            if (soft && hour == 8) c.Weight = 3;
             if (c1.Id != c1r.Id)
                 Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
             else
@@ -610,16 +613,7 @@ namespace SchoolyConnect
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
                     counter++;
                     //Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
-                }
-            _Class cl = classes[1];
-            Log("classses[1] =" +  cl.Name);
-            int day = 0;
-            for (int h = 1; h < 10; ++h)
-            {
-                Variable x = ClassXVar(cl.Id, day, h);
-                Log("h = " + h + ":" + (int)cspSolution[x]);
-            }
-
+                }            
 
             Log("exported " + counter + " lines");
         }
