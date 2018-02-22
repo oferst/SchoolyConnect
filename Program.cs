@@ -27,6 +27,7 @@ namespace CourseScheduling
         static public bool flag_SoftnoOverlap = false;
         static public bool flag_filter = true;
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
+        static public bool flag_gaps_constraints = true; // true => add no-gap constraints. 
 
         // weights
         static public int weight_gap = 5; // when flag_postProcess=true, this is the value of covering an early hour.
@@ -134,7 +135,7 @@ namespace CourseScheduling
 
                     if (flag_mode == Program.mode.JSONFile)
                     {
-                        string fileName = @"../../data/in/arlozerov.json";// from_server.json";// ";
+                        string fileName = @"../../data/in/עלי_גבעה.json";// from_server.json";// ";
                         sched.m.fromJSONFile(fileName);
                     }
                     else

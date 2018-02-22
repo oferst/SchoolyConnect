@@ -309,10 +309,14 @@ namespace CourseScheduling
                                 cspSolution[TT.Item1] = d;
                                 cspSolution[TT.Item2] = h;
                                 // update the x variables accordingly:
-                                Variable xv1 = m.ClassXVar(cl.Id, d, h), 
-                                         xv2 = m.ClassXVar(cl.Id, dd, hh);
-                                cspSolution[xv1] = 1;                                
-                                cspSolution[xv2] = 0;
+                                Variable xv1 = null, xv2 = null;
+                                if (Program.flag_gaps_constraints)
+                                {
+                                    xv1 = m.ClassXVar(cl.Id, d, h);
+                                    xv2 = m.ClassXVar(cl.Id, dd, hh);
+                                    cspSolution[xv1] = 1;
+                                    cspSolution[xv2] = 0;
+                                }
                                 int res = evaluate(csp, cspSolution);
                                 
                                 if (res >=0 && res < fine) // found an improvement!
@@ -322,13 +326,16 @@ namespace CourseScheduling
                                     best_day = dd;                                    
                                     best_day_var = TT.Item1;
                                     best_hour_var = TT.Item2;
-                                    best_x_var = xv2;
+                                    if (Program.flag_gaps_constraints) best_x_var = xv2;
                                 }
                                 
                                 cspSolution[TT.Item1] = currentDay;
                                 cspSolution[TT.Item2] = currentHour;
-                                cspSolution[xv1] = 0;
-                                cspSolution[xv2] = 1;
+                                if (Program.flag_gaps_constraints)
+                                {
+                                    cspSolution[xv1] = 0;
+                                    cspSolution[xv2] = 1;
+                                }
                             }
                         if (best_day_var != null)
                         {
@@ -336,9 +343,12 @@ namespace CourseScheduling
                             cspSolution[best_day_var] = d;
                             cspSolution[best_hour_var] = h;
                             daysCovered_down[best_day] = false; // this is how we open the option of taking more than one course from the same day.
-                            Variable xv1 = m.ClassXVar(cl.Id, d, h);
-                            cspSolution[xv1] = 1;
-                            cspSolution[best_x_var] = 0;
+                            if (Program.flag_gaps_constraints)
+                            {
+                                Variable xv1 = m.ClassXVar(cl.Id, d, h);
+                                cspSolution[xv1] = 1;
+                                cspSolution[best_x_var] = 0;
+                            }
                         }
                         else daysCovered_up[d] = true;
                     }

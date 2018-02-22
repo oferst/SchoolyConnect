@@ -5,6 +5,7 @@ using CourseScheduling;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace SchoolyConnect
 {
@@ -121,7 +122,7 @@ namespace SchoolyConnect
 
 
         /*************************   Utils ***************************/
-
+                
         private void Log(string v)
         {
             GlobalVar.Log.WriteLine(v);
@@ -233,9 +234,6 @@ namespace SchoolyConnect
             c.NegativeDisplayString = reason + ": no-overlap (" + c1.Name + " group " + g1 + "," + c2.Name+ " group " + g2 + ") ";
             Csp.Constraints.Add(c);
         }
-
-
-
 
         /// <summary>
         /// courses that have a shared class, shared teachers or sahred rooms cannot overlap
@@ -579,7 +577,7 @@ namespace SchoolyConnect
         /*************************   TieLib interface ***************************/
 
         public SimpleCSP Translate()
-        {
+        {            
             //buildGraph();
             Log("Translating.....");
             con_maxHours();
@@ -587,7 +585,8 @@ namespace SchoolyConnect
             con_off();
             con_HomeTeacherAbsentDay();
 
-            con_gaps();
+            if (Program.flag_gaps_constraints) con_gaps();
+
             //con_ActiveOnDay();
 
             return Csp;

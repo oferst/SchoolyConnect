@@ -459,7 +459,11 @@ namespace SchoolyConnect
         public void LoadFromJson(string jsonString)
         {
             JObject json = JObject.Parse(jsonString);
-            SolutionId = json["solution_id"].ToString();
+            try
+            {
+                SolutionId = json["solution_id"].ToString();
+            }
+            catch { } // some models do not have it. 
 
             JToken jSchool = json["school"];
             SchoolName = jSchool["school_name"].ToString();
@@ -509,6 +513,7 @@ namespace SchoolyConnect
 
             IList<JToken> jCourses = json["courses"].Children().ToList();
             bool warned_filter = false;
+            
             foreach (JToken jCourse in jCourses)
             {
                 string id = jCourse["id"].ToString();
@@ -545,10 +550,10 @@ namespace SchoolyConnect
                                 false
                              || cl.Name.Contains("א")
                              || cl.Name.Contains("ב")
-    //                         || cl.Name.Contains("ג")
-  //                           || cl.Name.Contains("ד")
-//                             || cl.Name.Contains("ה")
-                           //|| cl.Name.Contains("ו")
+                             || cl.Name.Contains("ג")
+                             || cl.Name.Contains("ד")
+                             || cl.Name.Contains("ה")
+                           || cl.Name.Contains("ו")
                         //|| cl.Name.Contains("ו2")
                         //|| cl.Name.Contains("ו3")
                         //|| cl.Name.Contains("ו4")
