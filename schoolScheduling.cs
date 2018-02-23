@@ -4,7 +4,6 @@ using SchoolyConnect;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Windows.Forms;
 
 namespace CourseScheduling
 {
@@ -29,7 +28,7 @@ namespace CourseScheduling
             m.ExportSolution(cspSolution);
             if (Program.flag_mode == Program.mode.JSONFile || Program.flag_mode == Program.mode.ServerLoop)
             {
-                m.printSolution();
+                if (Program.flag_LogSolution) m.printSolution();
                 if (Program.flag_sendSolution)
                 {
                     string receipt = m.SaveSolution(true);
@@ -38,7 +37,7 @@ namespace CourseScheduling
             }
             else
             {
-                m.printSolution();
+                if (Program.flag_LogSolution) m.printSolution();
             }
             cspSolution.Clear();
         }
@@ -149,7 +148,7 @@ namespace CourseScheduling
                 int currentDay = (int)cspSolution[vd];
                 int currentHour = (int)cspSolution[vh];
 
-                int best_day = -1, best_hour = -1, fine = 100;
+                int best_day = -1, best_hour = -1, fine = int.MaxValue;
                 for (int h = 0; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     {                                                
@@ -161,15 +160,36 @@ namespace CourseScheduling
                         int slot_fine = 0;
                         foreach (Constraint c in csp.Constraints)
                         {
-                            if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
-                            if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT ||
-                               (Program.flag_SoftnoOverlap && (c.NegativeDisplayString.Contains("no-overlap")))                                
-                               )
+                            if (c.Weight == 0) continue;                            
+                            if (c.IsSatisfied(cspSolution)) continue;
+                            if (c.Weight != Constraint.HARD_CONSTRAINT_WEIGHT &&
+                                (!Program.flag_SoftnoOverlap || !c.NegativeDisplayString.Contains("no-overlap")))
                             {
-                                fail = true;
-                                break;
+                                slot_fine += c.Weight;
+                                continue;
                             }
-                            slot_fine += c.Weight;                                                            
+                            if (c.NegativeDisplayString.Contains("gap"))
+                            {
+                                //a gap constraint can be violated only if we run with flag_softNooverlap=true, 
+                                // and while fixing thesolution (in this method), we move a course to a different slot.
+                                // by making the move we create a new gap. But this gap is regardless of the current fix (because
+                                // we are not goingto report that course in it current schedule anyway). So by continuing
+                                // we do not let us stop us from making the move. 
+                                continue; // since we only fill slots, gap constraints can only get better anyway.
+                            }
+                            List<Variable> cVars = c.getVars();
+                            bool isInTryFix = false;
+                            foreach (Variable v in cVars)
+                                if (v != vd && v != vh &&
+                                    tryFix.ContainsKey(v.Name.Substring(2)))
+                                {
+                                    isInTryFix = true;
+                                    break;
+                                }
+                            if (isInTryFix) continue;
+                            
+                            fail = true;
+                            break;
                         }
                         if (!fail && (slot_fine < fine))
                         {
@@ -181,9 +201,9 @@ namespace CourseScheduling
 
                 if (best_day >=0) // found a slot for course
                 {
-                    solved.Add(course);
-                    Log("Solved " + m.getCourseContained(course).Name + ":" + best_day + "," + best_hour);                    
-                    
+                    solved.Add(course); 
+                    Log("Solved " + m.getCourseContained(course).Name + ":" + best_day + "," + best_hour);
+                    tryFix.Remove(course);
                     cspSolution[vd] = best_day;
                     cspSolution[vh] = best_hour;
                 }
@@ -242,6 +262,7 @@ namespace CourseScheduling
             foreach (Constraint c in csp.Constraints)
             {
                 if (c.Weight == 0 || c.IsSatisfied(cspSolution)) continue;
+                if (c.NegativeDisplayString.Contains("gap")) continue; // since we never create gaps (they can only happen because we moved a course that overlapped with something else with flag_softOverlapp=true) then violating it does not matter. 
                 if (c.Weight == Constraint.HARD_CONSTRAINT_WEIGHT) return -1;
                 
                 if (Program.flag_SoftnoOverlap && (c.NegativeDisplayString.Contains("no-overlap")))
@@ -250,10 +271,11 @@ namespace CourseScheduling
                     List<Variable> list = c.getVars();
                     bool ok = false;
                     foreach (var v in list)
-                        foreach (string st in m.uncoveredCourses)
-                    {
-                            if (v.Name.Contains(st)) ok = true;                        
-                    }
+                        if (m.uncoveredCourses.Contains(v.Name.Substring(2)))
+                        {
+                            ok = true;
+                            break;
+                        }                    
                     if (!ok) return -1;
                     continue;
                 }
@@ -273,6 +295,7 @@ namespace CourseScheduling
             int gain = 0;
             foreach (_Class cl in m.classes)
             {
+                Log("fix gaps of " + cl.Name);
                 bool[] daysCovered_up = new bool[_ObjectWithTimeTable.MAX_DAY];
                 for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
@@ -339,7 +362,7 @@ namespace CourseScheduling
                             }
                         if (best_day_var != null)
                         {
-                            Log("fixHoles: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day_var].ToString() + "," + cspSolution[best_hour_var].ToString() + ") => (" + d + "," + h + ")");
+                            Log("fixGaps: \n\t" + cl.Name + "\n\t (" + cspSolution[best_day_var].ToString() + "," + cspSolution[best_hour_var].ToString() + ") => (" + d + "," + h + ")");
                             cspSolution[best_day_var] = d;
                             cspSolution[best_hour_var] = h;
                             daysCovered_down[best_day] = false; // this is how we open the option of taking more than one course from the same day.
@@ -353,7 +376,7 @@ namespace CourseScheduling
                         else daysCovered_up[d] = true;
                     }
             }
-            Log("fixHoles reduced fine by " + gain);
+            Log("fixGaps reduced fine by " + gain);
             return gain;
         }
 

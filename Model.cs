@@ -59,7 +59,7 @@ namespace SchoolyConnect
                 }
 
                 Domain domHours = new Domain(0, maxHour); // note that we are 0-based.
-                Log(c.Name + " " + maxHour);
+               // Log(c.Name + " " + maxHour);
                 for (int g = 0; g < c.Hours; ++g)
                 {
                     Variable vd = new Variable(CourseVarName(true, c.Course_Type, c.Id, g), domDays);
@@ -69,7 +69,7 @@ namespace SchoolyConnect
                     courseHVars[vh.Name] = vh;
                 }
             }
-            Log("# of slots to be scheduled: " + courseDVars.Count + " from them " + counterFrontal + "are type F");
+            Log("# of slots to be scheduled: " + courseDVars.Count + " from them " + counterFrontal + " are type F");
 
         }
 
@@ -212,12 +212,12 @@ namespace SchoolyConnect
                 quad = new Tuple<string, string, int, int>(c2r.Id, c1r.Id, g2, g1);
             if (!nooverlap_constrained.Add(quad))
             {
-                Log("removed redundant noOverlap");
+                // Log("removed redundant noOverlap");
                 return;
             }
 
 
-            Log("nooverlap(" + c1r.Name + " group " + g1 + "," + c2r.Name + " group " + g2 + "," + reason + ")");
+            if (Program.flag_LogConstraints) Log("nooverlap(" + c1r.Name + " group " + g1 + "," + c2r.Name + " group " + g2 + "," + reason + ")");
             Variable vd1 = CourseVar(true, c1r.Course_Type, c1r.Id, g1);
             Variable vd2 = CourseVar(true, c2r.Course_Type, c2r.Id, g2);
             Variable vh1 = CourseVar(false, c1r.Course_Type, c1r.Id, g1);
@@ -227,7 +227,7 @@ namespace SchoolyConnect
             c = new CompositeConstraint(BooleanOperator.OR, new Constraint[]{
                                             new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ),
                                             new VarVarConstraint(vh1, vh2, ArithmeticalOperator.NEQ) });
-            if (Program.flag_SoftnoOverlap) c.Weight = 3;
+            if (Program.flag_SoftnoOverlap) c.Weight = Program.weight_nooverlap;
 
             // Note we put in NegativeDisplayString the original courses c1,c2
             // also note that we search for the term 'no-overlap' in 'CheckSolution' so do not change it. 
@@ -240,6 +240,7 @@ namespace SchoolyConnect
         /// </summary>
         void con_noOverlap()
         {
+            Log("Adding nooverlap constraints");
             // groups of the same course
             for (int i = 0; i < tCourses.Count; ++i)
             {
@@ -296,7 +297,7 @@ namespace SchoolyConnect
             Tuple<string, int, int, int> quad = new Tuple<string, int, int, int>(c1r.Id, group, day, hour);
             if (!off_constrained.Add(quad))
             {
-                Log("Removed redundant off constraints");
+                //Log("Removed redundant off constraints");
                 return;
             }
 
@@ -315,10 +316,13 @@ namespace SchoolyConnect
             if (soft && c1.Classes.Count > 0 && c1.Teachers.Count > 0 && c1.Teachers.Contains(c1.Classes[0].myTeacher))
                 c.Weight += Program.weight_homeTeacherOnLateHour; // we want home teachers to be early so we can later move others to the homeTecher's free day. 
             // note that in the negativeDisplayString we put the original course c1 and not c1r
-            if (c1.Id != c1r.Id)
-                Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
-            else
-                Log("off(" + c1r.Name + " group " + group + "," + day + "," + hour + "," + reason + "weight " +  c.Weight + ")");
+            if (Program.flag_LogConstraints)
+            {
+                if (c1.Id != c1r.Id)
+                    Log("off(" + c1r.Name + "(representing " + c1.Name + ") group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
+                else
+                    Log("off(" + c1r.Name + " group " + group + "," + day + "," + hour + "," + reason + "weight " + c.Weight + ")");
+            }
             c.NegativeDisplayString = reason + ": (course = " + c1.Name + ", day = " + day + ", hour = " + hour + " weight = " + c.Weight + ")";
             Csp.Constraints.Add(c);
         }
@@ -328,6 +332,7 @@ namespace SchoolyConnect
         /// </summary>
         void con_off()
         {
+            Log("Adding off constraints");
             foreach (TieSchedCourse c in tCourses)
             {
                 for (int g = 0; g < c.Hours; ++g)
@@ -408,7 +413,7 @@ namespace SchoolyConnect
                         Variable vd1 = CourseVar(true, c.Course_Type, c.Id, g + p1);
                         Variable vd2 = CourseVar(true, c.Course_Type, c.Id, g + p2);
                         Csp.Constraints.Add(new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ) { NegativeDisplayString = "Max_Daily_Hours: " + c.Name });
-                        Log("Max_Daily_Hours (" + c.Hours + "," + c.Max_Daily_Hours + ")" + c.Id + " " + (g + p1).ToString() + " " + (g + p2).ToString());
+                        if (Program.flag_LogConstraints) Log("Max_Daily_Hours (" + c.Hours + "," + c.Max_Daily_Hours + ") " + c.Id + " " + (g + p1).ToString() + " " + (g + p2).ToString());
                     }
                 g += partitionSize;
             }
@@ -445,6 +450,7 @@ namespace SchoolyConnect
 
         void con_maxHours()
         {
+            Log("Adding maxHours constraints");
             foreach (_Course c in courses)
             {
                 if (c.Course_Type != COURSE_TYPE_ENUM.F) continue;
@@ -468,6 +474,7 @@ namespace SchoolyConnect
 /// </summary>
         void con_HomeTeacherAbsentDay()
         {
+            Log("Adding homeTeacherAbsentDay (soft) constraints");
             foreach (_Teacher t in teachers)
             {
                 List<_Course> tNonHomeCourses = new List<_Course>(); // The courses given to class A, not by A's home-Teacher. 
@@ -501,7 +508,7 @@ namespace SchoolyConnect
                                 Variable vd = CourseVar(true, c.Course_Type, c.Id, g);
                                 VarValConstraint con = new VarValConstraint(vd, d, ArithmeticalOperator.EQ, Program.weight_nonHomeTeacherCoursesonFreeDay);
                                 con.NegativeDisplayString = "HomeTeacherAbsentDay: (" + c.Name + ", group " + g + " day = " + d + ")";
-                                Log(con.NegativeDisplayString);
+                                if (Program.flag_LogConstraints) Log(con.NegativeDisplayString);
                                 Csp.Constraints.Add(con);
                             }
 
@@ -516,6 +523,7 @@ namespace SchoolyConnect
        /// </summary>
         void con_gaps()
         {
+            Log("Adding gap constarints");
             Domain domx = new Domain(0, 1);
             
             foreach (_Class cl in classes)
@@ -553,7 +561,7 @@ namespace SchoolyConnect
                         dir2.SubConstraints.Add(new CompositeConstraint(BooleanOperator.NOT, disj));
                         dir1.NegativeDisplayString = dir2.NegativeDisplayString = "gap:\n\t" + cl.Name + ",\n\t" + d + "," + h;
 
-                        Log(dir1.NegativeDisplayString);
+                        if (Program.flag_LogConstraints) Log(dir1.NegativeDisplayString);
                         Csp.Constraints.Add(dir1);
                         Csp.Constraints.Add(dir2);
                         if (h == 1) prev_vx = vx;
@@ -564,7 +572,7 @@ namespace SchoolyConnect
                             implication.SubConstraints.Add(new VarValConstraint(vx, 0, ArithmeticalOperator.EQ)); // !vx
                             implication.SubConstraints.Add(new VarValConstraint(prev_vx, 1, ArithmeticalOperator.EQ));
                             implication.NegativeDisplayString = "prevent gap: \n\t" + cl.Name + "\n\t," + d + "," + h + " => " + d + "," + (h - 1);
-                            Log(implication.NegativeDisplayString);
+                            if (Program.flag_LogConstraints) Log(implication.NegativeDisplayString);
                             Csp.Constraints.Add(implication);
                             prev_vx = vx;
                         }
@@ -602,13 +610,13 @@ namespace SchoolyConnect
                 {
                     _Course course = rep(c); // taking the schedule of the cluster's representative. 
                     var d = CourseVar(true, course.Course_Type, course.Id, g);
-                    
+                    var h = CourseVar(false, course.Course_Type, course.Id, g);
                     if (uncoveredCourses.Contains(d.Name.Substring(2)))
                     {
-                        Log("Not reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : ""));
+                        Log("Not reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + "(" + cspSolution[d] + "," + cspSolution[h]+")"));
                         continue;
                     }
-                    var h = CourseVar(false, course.Course_Type, course.Id, g);
+                    
                     c.AddSolutionLine((int)cspSolution[d], (int)cspSolution[h]);
                     counter++;
                     //Log("Reporting " + c.Name + " group " + g + ((course.Id != c.Id) ? "(cluster)" : "" + " day: " + (int)cspSolution[d] + " h:" + (int)cspSolution[h]));
