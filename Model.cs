@@ -312,8 +312,11 @@ namespace SchoolyConnect
             if (soft && hour == 6) c.Weight = Program.weight_hour6; 
             if (soft && hour == 7) c.Weight = Program.weight_hour7;
             if (soft && hour == 8) c.Weight = Program.weight_hour8;
-            
-            if (soft && c1.Classes.Count > 0 && c1.Teachers.Count > 0 && c1.Teachers.Contains(c1.Classes[0].myTeacher))
+            if (soft && hour == 9) c.Weight = Program.weight_hour9;
+
+            if (soft 
+                && c.Weight != Constraint.HARD_CONSTRAINT_WEIGHT // only because we want to be able to specify a hard constraint via the constants above (e.g. weight_hour9)
+                && c1.Classes.Count > 0 && c1.Teachers.Count > 0 && c1.Teachers.Contains(c1.Classes[0].myTeacher))
                 c.Weight += Program.weight_homeTeacherOnLateHour; // we want home teachers to be early so we can later move others to the homeTecher's free day. 
             // note that in the negativeDisplayString we put the original course c1 and not c1r
             if (Program.flag_LogConstraints)
@@ -404,6 +407,11 @@ namespace SchoolyConnect
         void con_maxHours(_Course c) // suppose c.Hours = 6, c.Max_Daily_Hours = 2;
         {
             int partitionSize = (int)Math.Ceiling(((float)c.Hours / c.Max_Daily_Hours)); // = 3
+            if (partitionSize > _ObjectWithTimeTable.MAX_DAY) 
+            {
+                Log("Ignoring max_daily_hours constraints of " + c.Name);
+                return;
+            }
             int g = 0;
             while (g < c.Hours)
             {
@@ -412,8 +420,10 @@ namespace SchoolyConnect
                     { // all pairs (0,1) (0,2) (1,2)
                         Variable vd1 = CourseVar(true, c.Course_Type, c.Id, g + p1);
                         Variable vd2 = CourseVar(true, c.Course_Type, c.Id, g + p2);
-                        Csp.Constraints.Add(new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ) { NegativeDisplayString = "Max_Daily_Hours: " + c.Name });
-                        if (Program.flag_LogConstraints) Log("Max_Daily_Hours (" + c.Hours + "," + c.Max_Daily_Hours + ") " + c.Id + " " + (g + p1).ToString() + " " + (g + p2).ToString());
+                        VarVarConstraint con = new VarVarConstraint(vd1, vd2, ArithmeticalOperator.NEQ);
+                        con.NegativeDisplayString = "Max_Daily_Hours: " + c.Name + ", hours = " + c.Hours + ", max_daily_hours = " + c.Max_Daily_Hours + ", " + c.Id + " " + (g + p1).ToString() + " " + (g + p2).ToString();
+                        Csp.Constraints.Add(con);
+                        if (Program.flag_LogConstraints) Log(con.NegativeDisplayString);
                     }
                 g += partitionSize;
             }

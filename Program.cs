@@ -16,7 +16,7 @@ namespace CourseScheduling
 
         // general flags
         public enum mode { JSONFile, Local, ServerLoop}
-        static public mode flag_mode = mode.JSONFile;// mode.ServerLoop;// ; mode.JSONFile;
+        static public mode flag_mode = mode.JSONFile;// mode.ServerLoop;// ; 
         static public bool flag_sendSolution = true;
         static bool flag_debugConstraints = false;
         static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
@@ -34,11 +34,12 @@ namespace CourseScheduling
         // weights
         static public int weight_nooverlap = 8; // when flag_SoftnoOverlap = true, this is the weight
         static public int weight_gap = 5; // when flag_postProcess=true, this is the value of covering an early hour.
-        static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the value of placing non-home-teachers on the hom-teacher's free day. 
+        static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the value of placing non-home-teachers on the home-teacher's free day. 
         static public int weight_homeTeacherOnLateHour = 2;
         static public int weight_hour6 = 1;
         static public int weight_hour7 = 2;
-        static public int weight_hour8 = 3;
+        static public int weight_hour8 = 4;
+        static public int weight_hour9 = -1;
 
         static void ResetStaus(string solution_id = "rb43wp3XhNjWL3RaY")//"2NkgMZLh9RyaRXbhD")
         {
@@ -51,7 +52,8 @@ namespace CourseScheduling
         // 2) for class scheduling it has to be after registration info. is in. This happens in late August for winter semester, and around Feb. for spring semester.
         // 3) It limits the 'what-to-schedule'table, and in the end empties it.         
         public const bool make_benchmarks = false; // creates various benchmarks, copies them to the benchmarks dir, and exits.
-                
+
+        public static string fileName = "";
         /// <summary>
         /// Program entry point.
         /// </summary>
@@ -73,31 +75,31 @@ namespace CourseScheduling
                 Connect con = new Connect();
                 /******************* Check for pending requests *******************/
                 con.PollRequests();
-                
-                con.requests.ForEach(request =>
+
+                foreach (_SchoolRequest request in con.requests)
                 {
-                    if (request.status == "submit")
-                    {
-                        schoolScheduling sched = new schoolScheduling();
-                        sched.m = new TieSchedModel();
-                        sched.Log("-----------------------------");
-                        sched.Log("Pending Requests:");
-                        sched.Log(request.AsString());
-                        string jsonString = con.GetRequestData(request.solution_id);
-                        using (StreamWriter file = new StreamWriter("../../data/in/from_server.json"))
-                         file.WriteLine(jsonString);
-                        sched.m.fromJSONString(jsonString);
+                    if (request.status != "submit") continue;
 
-                        /* notify server, solution in progress */
-                        con.SetStatus(request.solution_id, "solver");
+                    schoolScheduling sched = new schoolScheduling();
+                    sched.m = new TieSchedModel();
+                    sched.Log("-----------------------------");
+                    sched.Log("Pending Requests:");
+                    sched.Log(request.AsString());
+                    string jsonString = con.GetRequestData(request.solution_id);
+                    fileName = "../../data/in/" + request.name + ".json";
+                    using (StreamWriter file = new StreamWriter(fileName))
+                        file.WriteLine(jsonString);
+                    sched.m.fromJSONString(jsonString);
 
-                        sched.Log("Solving....");
+                    /* notify server, solution in progress */
+                    con.SetStatus(request.solution_id, "solver");
 
-                        MainForm m = null;
-                        m = new MainForm(sched);
-                        m.ShowDialog();                      
-                    }
-                });
+                    sched.Log("Solving....");
+
+                    MainForm m = null;
+                    m = new MainForm(sched);
+                    m.ShowDialog();
+                };
                 MessageBox.Show("Ended request Loop");
                 GlobalVar.close_log();
                 return;
@@ -138,7 +140,7 @@ namespace CourseScheduling
 
                     if (flag_mode == Program.mode.JSONFile)
                     {
-                        string fileName = @"../../data/in/קרוב.json";// from_server.json";// ";
+                        fileName = @"../../data/in/עלי גבעה MZ.json";// from_server.json";// ";
                         sched.m.fromJSONFile(fileName);
                     }
                     else

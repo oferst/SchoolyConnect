@@ -16,7 +16,8 @@ namespace CourseScheduling
         
         /*********************  TieLib interface ***********************/
 
-        override public string Text() { return "שיבוץ לבתי ספר"; }
+        override public string Text() { return "school scheduling (file = " + Program.fileName + ")"; }
+
 
         override public Tuple<Hashtable, Hashtable> GetVarLists()
         {

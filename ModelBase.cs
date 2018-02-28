@@ -170,23 +170,25 @@ namespace SchoolyConnect
 
             if (Classes != null)
             {
-                if (slot > 8 ) return false;
+                foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
+                //    if (slot > 8 ) return false;
                 // blocking 8th hour for Aleph
-/*                if (slot >= 7) foreach (_Class cl in Classes)
-                        if (cl.Name.Contains("א")
-                           || cl.Name.Contains("ב")) return false;
+                /*                if (slot >= 7) foreach (_Class cl in Classes)
+                                        if (cl.Name.Contains("א")
+                                           || cl.Name.Contains("ב")) return false;
 
-                if (slot == 8)
-                    foreach (_Class cl in Classes)
-                        if (  
-                             cl.Name.Contains("ג")
-                            || cl.Name.Contains("ד")
-                            || cl.Name.Contains("ה")
-                            ) return false;
-                            */
-                
-               
+                                if (slot == 8)
+                                    foreach (_Class cl in Classes)
+                                        if (  
+                                             cl.Name.Contains("ג")
+                                            || cl.Name.Contains("ד")
+                                            || cl.Name.Contains("ה")
+                                            ) return false;
+                                            */
+
+
                 // last hours are soft-constrained
+                
                 if (slot >= 6 && Course_Type != COURSE_TYPE_ENUM.S) soft = true;
                 if (slot == 8 && Course_Type == COURSE_TYPE_ENUM.S) soft = true;
                 //if (!t.is_on(day, slot))  // original

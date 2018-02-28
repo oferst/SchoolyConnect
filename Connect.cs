@@ -43,15 +43,15 @@ namespace SchoolyConnect
 
         public Connect()
         {
-            host = "https://my-bg.schooly.co.il/schedule";
-        }
+//            host = "https://my-bg.schooly.co.il/schedule";
+        //}
 
-        /*
-         public Connect(bool isDevMode)
-        {
+        
+        // public Connect(bool isDevMode)
+        //{
             host = "http://dev.schooly.co.il:3000/schedule";
         }
-        */
+        
 
 
         public string Http(string url, string postData = null)
