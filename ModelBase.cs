@@ -532,7 +532,7 @@ namespace SchoolyConnect
                 /*************************************************/
                 //if (!name.Contains("א1")) continue;
                 if (course_type == "P" || course_type == "?") continue; // ? = temporary
-                if (name.Contains("צוות"))
+                if (!Program.flag_scheduleTeams && name.Contains("צוות"))
                 {
                     GlobalVar.Log.WriteLine("skipping " + name);
                     continue;

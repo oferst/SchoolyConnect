@@ -533,7 +533,7 @@ namespace SchoolyConnect
        /// </summary>
         void con_gaps()
         {
-            Log("Adding gap constarints");
+            Log("Adding gap (" + Program.flag_gaps_constraints.ToString() + ") constarints");
             Domain domx = new Domain(0, 1);
             
             foreach (_Class cl in classes)
@@ -582,6 +582,7 @@ namespace SchoolyConnect
                             implication.SubConstraints.Add(new VarValConstraint(vx, 0, ArithmeticalOperator.EQ)); // !vx
                             implication.SubConstraints.Add(new VarValConstraint(prev_vx, 1, ArithmeticalOperator.EQ));
                             implication.NegativeDisplayString = "prevent gap: \n\t" + cl.Name + "\n\t," + d + "," + h + " => " + d + "," + (h - 1);
+                            if (Program.flag_gaps_constraints == Program.GapsMode.soft) implication.Weight = Program.weight_gap;
                             if (Program.flag_LogConstraints) Log(implication.NegativeDisplayString);
                             Csp.Constraints.Add(implication);
                             prev_vx = vx;
@@ -603,7 +604,7 @@ namespace SchoolyConnect
             con_off();
             con_HomeTeacherAbsentDay();
 
-            if (Program.flag_gaps_constraints) con_gaps();
+            if (Program.flag_gaps_constraints != Program.GapsMode.off) con_gaps();
 
             //con_ActiveOnDay();
 

@@ -15,25 +15,27 @@ namespace CourseScheduling
     {
 
         // general flags
-        public enum mode { JSONFile, Local, ServerLoop}
+        public enum mode { JSONFile, Local, ServerLoop }
         static public mode flag_mode = mode.JSONFile;// mode.ServerLoop;// ; 
         static public bool flag_sendSolution = true;
         static bool flag_debugConstraints = false;
         static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
         static public bool flag_rerun = false; // attempt to re-run after adding constraints based on the previous solution.
-        static public bool flag_LogConstraints = true;
+        static public bool flag_LogConstraints = false;
         static public bool flag_LogSolution = false;
 
         // modeling flags
-        static public bool flag_ChooseFreeDayForTeachers = false;        
+        static public bool flag_ChooseFreeDayForTeachers = false;
         static public bool flag_SoftnoOverlap = false;
         static public bool flag_filter = true;
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
-        static public bool flag_gaps_constraints = false; //true; // true => add no-gap constraints. 
+        static public bool flag_scheduleTeams = true;
+        public enum GapsMode{off, soft, hard };
+        static public GapsMode flag_gaps_constraints = GapsMode.soft; //true; // true => add no-gap constraints. 
 
         // weights
         static public int weight_nooverlap = 8; // when flag_SoftnoOverlap = true, this is the weight
-        static public int weight_gap = 5; // when flag_postProcess=true, this is the value of covering an early hour.
+        static public int weight_gap = 5; // Two uses: with flag_gaps_constraints.soft, and when flag_postProcess=true, this is the value of covering an early hour.
         static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the value of placing non-home-teachers on the home-teacher's free day. 
         static public int weight_homeTeacherOnLateHour = 2;
         static public int weight_hour6 = 1;

@@ -297,11 +297,19 @@ namespace CourseScheduling
             foreach (_Class cl in m.classes)
             {
                 Log("fix gaps of " + cl.Name);
-                bool[] daysCovered_up = new bool[_ObjectWithTimeTable.MAX_DAY];
+                int[] lastScheduledHour = new int[_ObjectWithTimeTable.MAX_DAY];
+
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                {
+                    int h = _ObjectWithTimeTable.MAX_HOUR;
+                    while (groupAtHour(cspSolution, cl, d, h) == null && h>0) h--;
+                    lastScheduledHour[d] = h;
+                }
+
                 for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     {
-                        if (daysCovered_up[d]) continue;
+                        if (h > lastScheduledHour[d]) continue;
                         var T = groupAtHour(cspSolution, cl, d, h);
                         if (T != null) continue;
 
@@ -318,7 +326,7 @@ namespace CourseScheduling
 
                         // we only look for replacements if they do not create a gap. daysCovered[day]=true => the latest course on that day cannot be removed.
                         bool[] daysCovered_down = new bool[_ObjectWithTimeTable.MAX_DAY];
-                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh > h ; --hh)
+                        for (int hh = _ObjectWithTimeTable.MAX_HOUR - 1; hh >= h ; --hh)
                             for (int dd = 0; dd < _ObjectWithTimeTable.MAX_DAY; ++dd)
                             {
                                 if (daysCovered_down[dd]) continue;
@@ -334,7 +342,7 @@ namespace CourseScheduling
                                 cspSolution[TT.Item2] = h;
                                 // update the x variables accordingly:
                                 Variable xv1 = null, xv2 = null;
-                                if (Program.flag_gaps_constraints)
+                                if (Program.flag_gaps_constraints!= Program.GapsMode.off)
                                 {
                                     xv1 = m.ClassXVar(cl.Id, d, h);
                                     xv2 = m.ClassXVar(cl.Id, dd, hh);
@@ -350,12 +358,12 @@ namespace CourseScheduling
                                     best_day = dd;                                    
                                     best_day_var = TT.Item1;
                                     best_hour_var = TT.Item2;
-                                    if (Program.flag_gaps_constraints) best_x_var = xv2;
+                                    if (Program.flag_gaps_constraints != Program.GapsMode.off) best_x_var = xv2;
                                 }
                                 
                                 cspSolution[TT.Item1] = currentDay;
                                 cspSolution[TT.Item2] = currentHour;
-                                if (Program.flag_gaps_constraints)
+                                if (Program.flag_gaps_constraints != Program.GapsMode.off)
                                 {
                                     cspSolution[xv1] = 0;
                                     cspSolution[xv2] = 1;
@@ -367,14 +375,14 @@ namespace CourseScheduling
                             cspSolution[best_day_var] = d;
                             cspSolution[best_hour_var] = h;
                             daysCovered_down[best_day] = false; // this is how we open the option of taking more than one course from the same day.
-                            if (Program.flag_gaps_constraints)
+                            lastScheduledHour[best_day]--;
+                            if (Program.flag_gaps_constraints != Program.GapsMode.off)
                             {
                                 Variable xv1 = m.ClassXVar(cl.Id, d, h);
                                 cspSolution[xv1] = 1;
                                 cspSolution[best_x_var] = 0;
                             }
-                        }
-                        else daysCovered_up[d] = true;
+                        }                        
                     }
             }
             Log("fixGaps reduced fine by " + gain);
