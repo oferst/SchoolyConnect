@@ -16,22 +16,25 @@ namespace CourseScheduling
 
         // general flags
         public enum mode { JSONFile, Local, ServerLoop }
-        static public mode flag_mode = mode.JSONFile;// mode.ServerLoop;// ; 
+        static public mode flag_mode = mode.JSONFile; // mode.ServerLoop;// ;
+        public static string fileName = @"../../data/in/חבד אוטו עופר.json";
+        static public bool flag_filter = false;
         static public bool flag_sendSolution = true;
         static bool flag_debugConstraints = false;
-        static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
-        static public bool flag_rerun = false; // attempt to re-run after adding constraints based on the previous solution.
         static public bool flag_LogConstraints = false;
         static public bool flag_LogSolution = false;
 
+        // solving flags
+        static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
+        static public bool flag_rerun = false; // attempt to re-run after adding constraints based on the previous solution.
+        
         // modeling flags
         static public bool flag_ChooseFreeDayForTeachers = false;
-        static public bool flag_SoftnoOverlap = false;
-        static public bool flag_filter = true;
+        static public bool flag_SoftnoOverlap = true;        
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
-        static public bool flag_scheduleTeams = true;
-        public enum GapsMode{off, soft, hard };
-        static public GapsMode flag_gaps_constraints = GapsMode.soft; //true; // true => add no-gap constraints. 
+        static public bool flag_scheduleTeams = false;
+        public enum GapsMode{off, soft, hard }; // note: hard is less relevant if softnoOverlap = true, because we will not report some courses, which creates gaps.
+        static public GapsMode flag_gaps_constraints = GapsMode.hard; //true; // true => add no-gap constraints. 
 
         // weights
         static public int weight_nooverlap = 8; // when flag_SoftnoOverlap = true, this is the weight
@@ -41,7 +44,7 @@ namespace CourseScheduling
         static public int weight_hour6 = 1;
         static public int weight_hour7 = 2;
         static public int weight_hour8 = 4;
-        static public int weight_hour9 = -1;
+        static public int weight_hour9 = 6;
 
         static void ResetStaus(string solution_id = "rb43wp3XhNjWL3RaY")//"2NkgMZLh9RyaRXbhD")
         {
@@ -55,7 +58,7 @@ namespace CourseScheduling
         // 3) It limits the 'what-to-schedule'table, and in the end empties it.         
         public const bool make_benchmarks = false; // creates various benchmarks, copies them to the benchmarks dir, and exits.
 
-        public static string fileName = "";
+        
         /// <summary>
         /// Program entry point.
         /// </summary>
@@ -141,8 +144,7 @@ namespace CourseScheduling
                     sched.m = new TieSchedModel();
 
                     if (flag_mode == Program.mode.JSONFile)
-                    {
-                        fileName = @"../../data/in/עלי גבעה MZ.json";// from_server.json";// ";
+                    {                        
                         sched.m.fromJSONFile(fileName);
                     }
                     else
