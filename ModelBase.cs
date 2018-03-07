@@ -170,7 +170,7 @@ namespace SchoolyConnect
 
             if (Classes != null)
             {
-                foreach (var t in Classes) if (!t.is_on(day, slot)) return false;
+                foreach (var cl in Classes) if (!cl.is_on(day, slot)) return false;
                 //    if (slot > 8 ) return false;
                 // blocking 8th hour for Aleph
                 /*                if (slot >= 7) foreach (_Class cl in Classes)

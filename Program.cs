@@ -30,9 +30,10 @@ namespace CourseScheduling
         
         // modeling flags
         static public bool flag_ChooseFreeDayForTeachers = false;
-        static public bool flag_SoftnoOverlap = true;        
+        static public bool flag_SoftnoOverlap = false; //true;        
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
-        static public bool flag_scheduleTeams = false;
+        static public bool flag_scheduleTeams = true;
+        static public bool flag_nonHomeTeacherCoursesonFreeDay = false; // true => add soft constraints that encourage courses by non-home teachers to be scheduled on the home-teacher free day. 
         public enum GapsMode{off, soft, hard }; // note: hard is less relevant if softnoOverlap = true, because we will not report some courses, which creates gaps.
         static public GapsMode flag_gaps_constraints = GapsMode.hard; //true; // true => add no-gap constraints. 
 

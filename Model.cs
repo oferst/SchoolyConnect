@@ -602,7 +602,7 @@ namespace SchoolyConnect
             con_maxHours();
             con_noOverlap();
             con_off();
-            con_HomeTeacherAbsentDay();
+            if (Program.flag_nonHomeTeacherCoursesonFreeDay) con_HomeTeacherAbsentDay();
 
             if (Program.flag_gaps_constraints != Program.GapsMode.off) con_gaps();
 
