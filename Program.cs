@@ -16,8 +16,8 @@ namespace CourseScheduling
 
         // general flags
         public enum mode { JSONFile, Local, ServerLoop }
-        static public mode flag_mode = mode.JSONFile; // mode.ServerLoop;// ;
-        public static string fileName = @"../../data/in/חבד אוטו עופר.json";
+        static public mode flag_mode = mode.JSONFile;// ;
+        public static string fileName = @"../../data/in/אחוזה_עופר.json";
         static public bool flag_filter = false;
         static public bool flag_sendSolution = true;
         static bool flag_debugConstraints = false;
@@ -25,7 +25,7 @@ namespace CourseScheduling
         static public bool flag_LogSolution = false;
 
         // solving flags
-        static public bool flag_postProcess = true; // attempt to pull late hours into early hours.
+        static public bool flag_postProcess = true; //true; // attempt to pull late hours into early hours.
         static public bool flag_rerun = false; // attempt to re-run after adding constraints based on the previous solution.
         
         // modeling flags
@@ -34,6 +34,7 @@ namespace CourseScheduling
         static public bool flag_constrainAllMaxHours = false; // false => only 1-hour-max are constrained. 
         static public bool flag_scheduleTeams = true;
         static public bool flag_nonHomeTeacherCoursesonFreeDay = false; // true => add soft constraints that encourage courses by non-home teachers to be scheduled on the home-teacher free day. 
+        static public bool flag_homeTeacherFirstHour = true; // true => add soft constraint that encourage home teachers on first hour. 
         public enum GapsMode{off, soft, hard }; // note: hard is less relevant if softnoOverlap = true, because we will not report some courses, which creates gaps.
         static public GapsMode flag_gaps_constraints = GapsMode.hard; //true; // true => add no-gap constraints. 
 
@@ -42,6 +43,7 @@ namespace CourseScheduling
         static public int weight_gap = 5; // Two uses: with flag_gaps_constraints.soft, and when flag_postProcess=true, this is the value of covering an early hour.
         static public int weight_nonHomeTeacherCoursesonFreeDay = 2; // the value of placing non-home-teachers on the home-teacher's free day. 
         static public int weight_homeTeacherOnLateHour = 2;
+        static public int weight_homeTeacherFirstHour = 3;
         static public int weight_hour6 = 1;
         static public int weight_hour7 = 2;
         static public int weight_hour8 = 4;

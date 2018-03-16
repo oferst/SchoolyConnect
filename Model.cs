@@ -479,10 +479,60 @@ namespace SchoolyConnect
             }
         }
 
-/// <summary>
-/// Soft constraint: non-home-teacher courses should be given on the home-teacher free day.  
-/// </summary>
-        void con_HomeTeacherAbsentDay()
+        /// <summary>
+        /// TODO: currently the constraint is built based on the home teacher. But in many classes
+        /// the home teacher holds the majority of the hours, so better add the negated constraint for the rest. 
+        /// </summary>
+        void con_HomeTeacherFirstHour()
+        {
+            Log("Adding homeTeacherFirstHour (soft) constraints");
+
+            foreach (_Teacher t in teachers)
+            {
+                List<_Course> tHomeCourses = new List<_Course>(); // The courses given to class A, by A's home-Teacher. 
+                if (t.MyClass == null) continue;
+                tHomeCourses.Clear();
+                foreach (_Course c in courses)
+                {
+                    if (!c.Classes.Contains(t.MyClass)) continue; // course not given to t's class. 
+                    if (c.Teachers.Contains(t)) tHomeCourses.Add(c);
+                }
+
+
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                {                    
+                    if (!t.is_on(d, 1) || !t.MyClass.is_on(d, 1)) continue;
+                    // ccon will be a disjunction over the courses in tHomeCourses: one of them has to be 
+                    // in hour 1, every-day except t's free day.
+                    CompositeConstraint ccon = new CompositeConstraint(BooleanOperator.OR);
+                    foreach (_Course c in tHomeCourses)
+                    {
+                        for (int g = 0; g < c.Hours; ++g)
+                        {
+                            Variable vd = CourseVar(true, c.Course_Type, c.Id, g);
+                            VarValConstraint con = new VarValConstraint(vd, d, ArithmeticalOperator.EQ);
+                            Variable vh = CourseVar(false, c.Course_Type, c.Id, g);
+                            VarValConstraint conh = new VarValConstraint(vh, 1, ArithmeticalOperator.EQ);
+                            // conj = c on day d and hour = 1
+                            CompositeConstraint conj = new CompositeConstraint(BooleanOperator.AND);
+                            conj.SubConstraints.Add(con);
+                            conj.SubConstraints.Add(conh);
+                            ccon.SubConstraints.Add(conj);                     
+                        }
+                    }
+                    ccon.Weight = Program.weight_homeTeacherFirstHour;
+                    ccon.NegativeDisplayString = "HomeTeacherFirstHour: (teacher = " + t.Name +  " day = " + d + ")";
+                    if (Program.flag_LogConstraints) Log(ccon.NegativeDisplayString);
+                    Csp.Constraints.Add(ccon);
+                }
+            }
+        }
+
+
+            /// <summary>
+            /// Soft constraint: non-home-teacher courses should be given on the home-teacher free day.  
+            /// </summary>
+            void con_HomeTeacherAbsentDay()
         {
             Log("Adding homeTeacherAbsentDay (soft) constraints");
             foreach (_Teacher t in teachers)
@@ -497,7 +547,7 @@ namespace SchoolyConnect
                     tNonHomeCourses.Add(c);
                 }
                 // we now search for T's free day
-                for (int d = 1; d < _ObjectWithTimeTable.MAX_DAY; ++d)
+                for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                 {
                     bool on_thatDay = false;
                     // checking t's availability on that day
@@ -599,6 +649,8 @@ namespace SchoolyConnect
         {            
             //buildGraph();
             Log("Translating.....");
+            if (Program.flag_homeTeacherFirstHour) con_HomeTeacherFirstHour();
+      
             con_maxHours();
             con_noOverlap();
             con_off();

@@ -47,10 +47,7 @@ namespace CourseScheduling
         {
             return "school";
         }
-
         
-
-
         override public SimpleCSP TranslateToCSP() // main function for adding constraints **
         {
             if (m.Csp.Constraints.Count() > 0)
@@ -309,14 +306,15 @@ namespace CourseScheduling
                 for (int h = 1; h < _ObjectWithTimeTable.MAX_HOUR; ++h)
                     for (int d = 0; d < _ObjectWithTimeTable.MAX_DAY; ++d)
                     {
-                        if (h > lastScheduledHour[d]) continue;
+                        if (h > lastScheduledHour[d] + 1) continue; // do not create a gap
                         var T = groupAtHour(cspSolution, cl, d, h);
                         if (T != null) continue;
 
                         // found a gap                                           
-                   
+
                         // We can pay up to Program.gapWeight for closing this gap:
-                        int fine = evaluate(csp, cspSolution) + Program.weight_gap;
+                        int fine = evaluate(csp, cspSolution);
+                        if (h <= lastScheduledHour[d]) fine += Program.weight_gap; // a gap                        
                    
                         Debug.Assert(fine >= 0); 
 
@@ -351,7 +349,7 @@ namespace CourseScheduling
                                 }
                                 int res = evaluate(csp, cspSolution);
                                 
-                                if (res >=0 && res < fine) // found an improvement!
+                                if (res >=0 && (res < fine || (res == fine && h < hh))) // found an improvement!
                                 {
                                     gain += fine - res;
                                     fine = res;
@@ -376,6 +374,7 @@ namespace CourseScheduling
                             cspSolution[best_hour_var] = h;
                             daysCovered_down[best_day] = false; // this is how we open the option of taking more than one course from the same day.
                             lastScheduledHour[best_day]--;
+                            lastScheduledHour[d] = Math.Max(lastScheduledHour[d], h);
                             if (Program.flag_gaps_constraints != Program.GapsMode.off)
                             {
                                 Variable xv1 = m.ClassXVar(cl.Id, d, h);
@@ -388,6 +387,10 @@ namespace CourseScheduling
             Log("fixGaps reduced fine by " + gain);
             return gain;
         }
+
+
+
+
 
 
         /// <summary>
